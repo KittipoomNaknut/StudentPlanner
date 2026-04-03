@@ -3,7 +3,8 @@ import '../features/dashboard/dashboard_screen.dart';
 import '../features/schedule/schedule_screen.dart';
 import '../features/assignment/assignment_screen.dart';
 import '../features/grade/grade_screen.dart';
-import '../features/note/note_screen.dart';
+//import '../features/note/note_screen.dart';
+import '../features/subject/subject_screen.dart'; // TEMP
 
 class BottomNav extends StatefulWidget {
   const BottomNav({super.key});
@@ -21,7 +22,8 @@ class _BottomNavState extends State<BottomNav> {
     ScheduleScreen(),
     AssignmentScreen(),
     GradeScreen(),
-    NoteScreen(),
+    //NoteScreen(),
+    SubjectScreen(), // TEMP
   ];
 
   @override
@@ -57,10 +59,15 @@ class _BottomNavState extends State<BottomNav> {
             selectedIcon: Icon(Icons.grade),
             label: 'Grades',
           ),
+          // NavigationDestination(
+          //   icon: Icon(Icons.note_outlined),
+          //   selectedIcon: Icon(Icons.note),
+          //   label: 'Notes',
+          // ),
           NavigationDestination(
-            icon: Icon(Icons.note_outlined),
-            selectedIcon: Icon(Icons.note),
-            label: 'Notes',
+            icon: Icon(Icons.menu_book_outlined),
+            selectedIcon: Icon(Icons.menu_book),
+            label: 'Subjects',
           ),
         ],
       ),
