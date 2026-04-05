@@ -5,6 +5,7 @@ import '../../core/models/assignment.dart';
 import '../../core/models/schedule.dart';
 import '../../core/models/subject.dart';
 import '../../core/theme/app_theme.dart';
+import '../subject/subject_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -93,6 +94,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   _buildGreeting(),
                   const SizedBox(height: 16),
                   _buildStatRow(),
+                  const SizedBox(height: 24),
+                  _buildManageSubjectsCard(),
                   const SizedBox(height: 24),
                   if (_todayClasses.isNotEmpty) ...[
                     _buildSectionHeader(
@@ -318,6 +321,38 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildManageSubjectsCard() {
+    return Card(
+      child: ListTile(
+        onTap: () async {
+          await Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const SubjectScreen()),
+          );
+          _loadData(); // reload dashboard หลังกลับมา
+        },
+        leading: Container(
+          width: 42,
+          height: 42,
+          decoration: BoxDecoration(
+            color: AppTheme.primary.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(Icons.menu_book, color: AppTheme.primary),
+        ),
+        title: const Text(
+          'Manage Subjects',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        subtitle: Text(
+          '${_subjects.length} subject${_subjects.length != 1 ? 's' : ''} enrolled',
+          style: TextStyle(color: Colors.grey.shade600),
+        ),
+        trailing: const Icon(Icons.chevron_right),
       ),
     );
   }
