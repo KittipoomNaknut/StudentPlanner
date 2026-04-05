@@ -68,16 +68,6 @@ class _BottomNavState extends State<BottomNav> {
       ),
       // Settings icon บน AppBar ไม่มีใน BottomNav
       // เปิดผ่าน DashboardScreen แทน
-      floatingActionButton: FloatingActionButton.small(
-        onPressed: () => Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) =>
-                SettingsScreen(onThemeChanged: widget.onThemeChanged),
-          ),
-        ),
-        child: const Icon(Icons.settings),
-      ),
     );
   }
 }

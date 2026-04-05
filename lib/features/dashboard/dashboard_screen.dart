@@ -6,9 +6,12 @@ import '../../core/models/schedule.dart';
 import '../../core/models/subject.dart';
 import '../../core/theme/app_theme.dart';
 import '../subject/subject_screen.dart';
+import '../settings/settings_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
-  const DashboardScreen({super.key});
+  final void Function(ThemeMode) onThemeChanged;
+
+  const DashboardScreen({super.key, required this.onThemeChanged});
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
@@ -31,7 +34,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     setState(() => _isLoading = true);
     final db = DatabaseHelper.instance;
 
-    // โหลดพร้อมกันทุก query
     final results = await Future.wait([
       db.getSubjects(),
       db.getAssignments(status: 'pending'),
@@ -44,13 +46,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final classes = results[2] as List<Schedule>;
     final exams = results[3] as List<Schedule>;
 
-    // หาคลาสวันนี้
-    final todayIndex = DateTime.now().weekday - 1; // 0=จันทร์
+    final todayIndex = DateTime.now().weekday - 1;
     final todayClasses =
         classes.where((s) => s.dayOfWeek == todayIndex).toList()
           ..sort((a, b) => a.startTime.compareTo(b.startTime));
 
-    // หาสอบที่กำลังจะมาถึง (7 วันข้างหน้า)
     final now = DateTime.now();
     final nextWeek = now.add(const Duration(days: 7));
     final upcoming = exams.where((e) {
@@ -82,6 +82,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
         title: const Text('Student Planner'),
         actions: [
           IconButton(icon: const Icon(Icons.refresh), onPressed: _loadData),
+          IconButton(
+            icon: const Icon(Icons.settings_outlined),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) =>
+                    SettingsScreen(onThemeChanged: widget.onThemeChanged),
+              ),
+            ),
+          ),
         ],
       ),
       body: _isLoading
@@ -94,7 +104,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   _buildGreeting(),
                   const SizedBox(height: 16),
                   _buildStatRow(),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 12),
                   _buildManageSubjectsCard(),
                   const SizedBox(height: 24),
                   if (_todayClasses.isNotEmpty) ...[
@@ -133,7 +143,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  // ── Greeting ───────────────────────────────────────────
   Widget _buildGreeting() {
     final hour = DateTime.now().hour;
     final greeting = hour < 12
@@ -142,7 +151,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ? 'Good afternoon'
         : 'Good evening';
     final today = DateFormat('EEEE, dd MMM').format(DateTime.now());
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -158,10 +166,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  // ── Stat Summary Row ───────────────────────────────────
   Widget _buildStatRow() {
     final overdue = _pendingTasks.where((a) => a.isOverdue).length;
-
     return Row(
       children: [
         _buildStatCard(
@@ -217,6 +223,38 @@ class _DashboardScreenState extends State<DashboardScreen> {
             Text(label, style: TextStyle(fontSize: 11, color: color)),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildManageSubjectsCard() {
+    return Card(
+      child: ListTile(
+        onTap: () async {
+          await Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const SubjectScreen()),
+          );
+          _loadData();
+        },
+        leading: Container(
+          width: 42,
+          height: 42,
+          decoration: BoxDecoration(
+            color: AppTheme.primary.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(Icons.menu_book, color: AppTheme.primary),
+        ),
+        title: const Text(
+          'Manage Subjects',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        subtitle: Text(
+          '${_subjects.length} subject${_subjects.length != 1 ? 's' : ''} enrolled',
+          style: TextStyle(color: Colors.grey.shade600),
+        ),
+        trailing: const Icon(Icons.chevron_right),
       ),
     );
   }
@@ -301,8 +339,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           overflow: TextOverflow.ellipsis,
         ),
         subtitle: Text(
-          '${subject?.name ?? ''}'
-          '  •  Due ${a.deadline}'
+          '${subject?.name ?? ''}  •  Due ${a.deadline}'
           '${a.isOverdue ? '  ⚠️ Overdue' : ''}',
           style: TextStyle(color: a.isOverdue ? AppTheme.danger : null),
         ),
@@ -325,38 +362,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildManageSubjectsCard() {
-    return Card(
-      child: ListTile(
-        onTap: () async {
-          await Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const SubjectScreen()),
-          );
-          _loadData(); // reload dashboard หลังกลับมา
-        },
-        leading: Container(
-          width: 42,
-          height: 42,
-          decoration: BoxDecoration(
-            color: AppTheme.primary.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Icon(Icons.menu_book, color: AppTheme.primary),
-        ),
-        title: const Text(
-          'Manage Subjects',
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
-        subtitle: Text(
-          '${_subjects.length} subject${_subjects.length != 1 ? 's' : ''} enrolled',
-          style: TextStyle(color: Colors.grey.shade600),
-        ),
-        trailing: const Icon(Icons.chevron_right),
-      ),
-    );
-  }
-
   Widget _buildExamCard(Schedule s) {
     final subject = _getSubject(s.subjectId);
     final color = subject != null
@@ -366,7 +371,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final daysLeft = examDate != null
         ? examDate.difference(DateTime.now()).inDays
         : 0;
-
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       child: ListTile(
