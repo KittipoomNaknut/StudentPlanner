@@ -1,9 +1,9 @@
-// lib/features/schedule/add_schedule_screen.dart
 import 'package:flutter/material.dart';
 import '../../core/database/database_helper.dart';
 import '../../core/models/schedule.dart';
 import '../../core/models/subject.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/constants/app_constants.dart';
 
 class AddScheduleScreen extends StatefulWidget {
   final List<Subject> subjects;
@@ -197,7 +197,7 @@ class _AddScheduleScreenState extends State<AddScheduleScreen> {
                 children: List.generate(7, (i) {
                   final selected = _dayOfWeek == i;
                   return ChoiceChip(
-                    label: Text(_days[i]),
+                    label: Text(AppConstants.days[i]),
                     selected: selected,
                     onSelected: (_) => setState(() => _dayOfWeek = i),
                     selectedColor: AppTheme.primary,

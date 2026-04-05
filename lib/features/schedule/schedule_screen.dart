@@ -4,8 +4,7 @@ import '../../core/models/schedule.dart';
 import '../../core/models/subject.dart';
 import '../../core/theme/app_theme.dart';
 import 'add_schedule_screen.dart';
-
-const _days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+import '../../core/constants/app_constants.dart';
 
 class ScheduleScreen extends StatefulWidget {
   const ScheduleScreen({super.key});
@@ -145,7 +144,7 @@ class _ScheduleScreenState extends State<ScheduleScreen>
             Container(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
               child: Text(
-                _days[dayIndex],
+                AppConstants.days[dayIndex],
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   color: AppTheme.primary,
