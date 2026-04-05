@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import '../../core/database/database_helper.dart';
+import '../../core/i18n/app_strings.dart';
 import '../../core/models/note.dart';
 import '../../core/models/subject.dart';
 import '../../core/theme/app_theme.dart';
@@ -60,7 +61,8 @@ class _NoteScreenState extends State<NoteScreen> {
   }
 
   Future<void> _deleteNote(Note n) async {
-    final ok = await showConfirmDelete(context, title: 'Delete Note', content: 'Delete "${n.title}"?');
+    final str = AppStrings.of(context);
+    final ok = await showConfirmDelete(context, title: str.deleteNote, content: '"${n.title}"?');
     if (ok) {
       await DatabaseHelper.instance.deleteNote(n.id!);
       _loadData(search: _searchQuery.isEmpty ? null : _searchQuery);
@@ -69,10 +71,11 @@ class _NoteScreenState extends State<NoteScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
     return Scaffold(
       backgroundColor: AppTheme.background,
       appBar: AppBar(
-        title: const Text('Notes'),
+        title: Text(s.notes),
         actions: [
           PopupMenuButton<int?>(
             icon: Icon(Icons.filter_list_rounded,
@@ -104,7 +107,7 @@ class _NoteScreenState extends State<NoteScreen> {
               onChanged: _onSearch,
               style: const TextStyle(color: Colors.white),
               decoration: InputDecoration(
-                hintText: 'Search notes…',
+                hintText: s.search,
                 hintStyle: const TextStyle(color: Colors.white54),
                 prefixIcon: const Icon(Icons.search_rounded, color: Colors.white54),
                 suffixIcon: _searchCtrl.text.isNotEmpty
@@ -126,8 +129,8 @@ class _NoteScreenState extends State<NoteScreen> {
           : _notes.isEmpty
           ? EmptyState(
               icon: Icons.sticky_note_2_rounded,
-              title: _searchQuery.isNotEmpty ? 'No notes found' : 'No notes yet',
-              subtitle: _searchQuery.isNotEmpty ? 'Try a different search' : 'Tap + to create a note',
+              title: s.noNotesYet,
+              subtitle: _searchQuery.isNotEmpty ? 'Try a different search' : s.noNotesSubtitle,
             )
           : _buildGrid(),
       floatingActionButton: FloatingActionButton(
@@ -232,7 +235,7 @@ class _NoteCard extends StatelessWidget {
                     Expanded(
                       child: Text(
                         note.content,
-                        style: GoogleFonts.nunito(color: Colors.grey.shade500, fontSize: 12, height: 1.5),
+                        style: GoogleFonts.nunito(color: Colors.grey.shade500, fontSize: 13, height: 1.5),
                         maxLines: 4, overflow: TextOverflow.fade,
                       ),
                     ),
@@ -247,12 +250,12 @@ class _NoteCard extends StatelessWidget {
                           ),
                           child: Text(
                             subject?.name ?? 'Unknown',
-                            style: GoogleFonts.nunito(color: color, fontSize: 10, fontWeight: FontWeight.w700),
+                            style: GoogleFonts.nunito(color: color, fontSize: 13, fontWeight: FontWeight.w700),
                             maxLines: 1, overflow: TextOverflow.ellipsis,
                           ),
                         ),
                         const Spacer(),
-                        Text(dateStr, style: GoogleFonts.nunito(color: Colors.grey.shade300, fontSize: 10)),
+                        Text(dateStr, style: GoogleFonts.nunito(color: Colors.grey.shade300, fontSize: 13)),
                       ],
                     ),
                   ],

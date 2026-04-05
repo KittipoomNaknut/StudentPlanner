@@ -185,10 +185,10 @@ class _PomodoroScreenState extends State<PomodoroScreen> with TickerProviderStat
         child: Column(children: [
           Text(label, style: GoogleFonts.nunito(
             color: selected ? _primaryColor : Colors.white,
-            fontSize: 12, fontWeight: FontWeight.w700)),
+            fontSize: 13, fontWeight: FontWeight.w700)),
           Text('${mins}m', style: GoogleFonts.nunito(
             color: selected ? _primaryColor.withValues(alpha: 0.7) : Colors.white60,
-            fontSize: 10)),
+            fontSize: 13)),
         ]),
       ),
     );

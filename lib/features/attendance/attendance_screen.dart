@@ -170,7 +170,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                   Text(
                     s.name.length > 10 ? '${s.name.substring(0, 10)}…' : s.name,
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: 13,
                       fontWeight: FontWeight.bold,
                       color: _selectedSubjectId == s.id
                           ? Colors.white
@@ -181,7 +181,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                   Text(
                     rate > 0 ? '$pct%' : 'No data',
                     style: TextStyle(
-                      fontSize: 11,
+                      fontSize: 13,
                       color: _selectedSubjectId == s.id
                           ? Colors.white70
                           : (isLow ? AppTheme.danger : Colors.grey.shade500),
@@ -251,7 +251,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                             'Below 75% threshold!',
                             style: TextStyle(
                               color: Colors.yellowAccent,
-                              fontSize: 12,
+                              fontSize: 13,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
@@ -312,7 +312,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         ),
         Text(
           label,
-          style: const TextStyle(color: Colors.white60, fontSize: 11),
+          style: const TextStyle(color: Colors.white60, fontSize: 13),
         ),
       ],
     );
@@ -355,7 +355,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                     todayRecord.status.toUpperCase(),
                     style: TextStyle(
                       color: AppTheme.attendanceColor(todayRecord.status),
-                      fontSize: 11,
+                      fontSize: 13,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -437,7 +437,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                   a.status.toUpperCase(),
                   style: TextStyle(
                     color: color,
-                    fontSize: 11,
+                    fontSize: 13,
                     fontWeight: FontWeight.bold,
                   ),
                 ),

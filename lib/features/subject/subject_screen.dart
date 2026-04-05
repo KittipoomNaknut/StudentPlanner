@@ -123,7 +123,7 @@ class _SubjectCard extends StatelessWidget {
                     '${subject.credits} credits',
                     if (subject.teacher.isNotEmpty) subject.teacher,
                   ].join('  ·  '),
-                  style: GoogleFonts.nunito(color: Colors.grey.shade400, fontSize: 12),
+                  style: GoogleFonts.nunito(color: Colors.grey.shade400, fontSize: 13),
                 ),
               ])),
               PopupMenuButton<String>(

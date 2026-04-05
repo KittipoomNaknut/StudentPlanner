@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../core/database/database_helper.dart';
+import '../../core/i18n/app_strings.dart';
 import '../../core/models/grade.dart';
 import '../../core/models/subject.dart';
 import '../../core/theme/app_theme.dart';
@@ -35,15 +36,16 @@ class _GradeScreenState extends State<GradeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
     final gpa = _gpa();
     return Scaffold(
       backgroundColor: AppTheme.background,
       appBar: AppBar(
-        title: const Text('Grades'),
+        title: Text(s.grades),
         actions: [
           IconButton(
             icon: const Icon(Icons.calculate_outlined),
-            tooltip: 'GPA Calculator',
+            tooltip: s.gpaCalculator,
             onPressed: _showGPACalculator,
           ),
         ],
@@ -51,7 +53,7 @@ class _GradeScreenState extends State<GradeScreen> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _subjects.isEmpty
-          ? const EmptyState(icon: Icons.bar_chart_rounded, title: 'No subjects yet', subtitle: 'Add subjects first to track grades')
+          ? EmptyState(icon: Icons.bar_chart_rounded, title: s.noGradesYet, subtitle: 'Add subjects first to track grades')
           : Column(children: [
               _buildGPABanner(gpa),
               Expanded(child: _buildList()),
@@ -97,7 +99,7 @@ class _GradeScreenState extends State<GradeScreen> {
                           children: [
                             Text(gpa.toStringAsFixed(2),
                               style: GoogleFonts.nunito(color: Colors.white, fontSize: 28, fontWeight: FontWeight.w800)),
-                            Text('/ 4.00', style: GoogleFonts.nunito(color: Colors.white60, fontSize: 11)),
+                            Text('/ 4.00', style: GoogleFonts.nunito(color: Colors.white60, fontSize: 13)),
                           ],
                         ),
                       ],
@@ -109,7 +111,7 @@ class _GradeScreenState extends State<GradeScreen> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Cumulative GPA', style: GoogleFonts.nunito(color: Colors.white70, fontSize: 13)),
+                        Text(AppStrings.of(context).gpaTitle, style: GoogleFonts.nunito(color: Colors.white70, fontSize: 13)),
                         const SizedBox(height: 6),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
@@ -121,7 +123,7 @@ class _GradeScreenState extends State<GradeScreen> {
                         ),
                         const SizedBox(height: 8),
                         Text('${_subjects.length} subject${_subjects.length != 1 ? 's' : ''} enrolled',
-                          style: GoogleFonts.nunito(color: Colors.white60, fontSize: 12)),
+                          style: GoogleFonts.nunito(color: Colors.white60, fontSize: 13)),
                       ],
                     ),
                   ),
@@ -196,7 +198,7 @@ class _GradeScreenState extends State<GradeScreen> {
                               Text(subject.name, style: GoogleFonts.nunito(fontWeight: FontWeight.w700, fontSize: 15)),
                               const SizedBox(height: 2),
                               Text('${subject.credits} credits  ·  ${grades.length} entries',
-                                style: GoogleFonts.nunito(color: Colors.grey.shade500, fontSize: 12)),
+                                style: GoogleFonts.nunito(color: Colors.grey.shade500, fontSize: 13)),
                               if (grades.isNotEmpty) ...[
                                 const SizedBox(height: 6),
                                 ClipRRect(
@@ -225,7 +227,7 @@ class _GradeScreenState extends State<GradeScreen> {
                                       fontSize: 16,
                                     )),
                                   Text('GP ${gp.toStringAsFixed(1)}',
-                                    style: GoogleFonts.nunito(color: Colors.grey.shade400, fontSize: 12)),
+                                    style: GoogleFonts.nunito(color: Colors.grey.shade400, fontSize: 13)),
                                 ],
                               ),
                       ],
@@ -303,7 +305,7 @@ class _GradeScreenState extends State<GradeScreen> {
                     children: [
                       Text('GPA Calculator', style: GoogleFonts.nunito(fontSize: 18, fontWeight: FontWeight.w800)),
                       Text('Current GPA: ${currentGPA.toStringAsFixed(2)}  ·  $currentCredits credits',
-                        style: GoogleFonts.nunito(color: Colors.grey.shade500, fontSize: 12)),
+                        style: GoogleFonts.nunito(color: Colors.grey.shade500, fontSize: 13)),
                     ],
                   ),
                 ],

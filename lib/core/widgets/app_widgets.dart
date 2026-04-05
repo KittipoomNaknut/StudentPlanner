@@ -238,7 +238,7 @@ class StatCard extends StatelessWidget {
               Text(
                 label,
                 style: GoogleFonts.nunito(
-                  fontSize: 11,
+                  fontSize: 13,
                   fontWeight: FontWeight.w600,
                   color: color.withValues(alpha: 0.7),
                 ),
@@ -270,7 +270,7 @@ class PriorityBadge extends StatelessWidget {
       child: Text(
         priority.toUpperCase(),
         style: GoogleFonts.nunito(
-          fontSize: 9,
+          fontSize: 11,
           fontWeight: FontWeight.w800,
           color: color,
           letterSpacing: 0.5,

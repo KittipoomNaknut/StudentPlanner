@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:intl/intl.dart';
 import '../../core/database/database_helper.dart';
+import '../../core/i18n/app_strings.dart';
 import '../../core/models/assignment.dart';
 import '../../core/models/schedule.dart';
 import '../../core/models/subject.dart';
@@ -97,10 +98,11 @@ class _ScheduleScreenState extends State<ScheduleScreen>
   List<dynamic> _selectedDayEvents() => _eventsForDay(_selectedDay);
 
   Future<void> _delete(Schedule s) async {
+    final str = AppStrings.of(context);
     final confirmed = await showConfirmDelete(
       context,
-      title: 'Delete Schedule',
-      content: 'Delete this schedule entry?',
+      title: str.deleteSchedule,
+      content: str.deleteScheduleBody,
     );
     if (confirmed) {
       await DatabaseHelper.instance.deleteSchedule(s.id!);
@@ -110,13 +112,14 @@ class _ScheduleScreenState extends State<ScheduleScreen>
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Schedule'),
+        title: Text(s.schedule),
         actions: [
           IconButton(
             icon: Icon(_showCalendar ? Icons.list : Icons.calendar_month),
-            tooltip: _showCalendar ? 'List View' : 'Calendar View',
+            tooltip: _showCalendar ? s.listView : s.calendarView,
             onPressed: () => setState(() => _showCalendar = !_showCalendar),
           ),
         ],
@@ -127,9 +130,9 @@ class _ScheduleScreenState extends State<ScheduleScreen>
                 indicatorColor: Colors.white,
                 labelColor: Colors.white,
                 unselectedLabelColor: Colors.white60,
-                tabs: const [
-                  Tab(icon: Icon(Icons.class_outlined), text: 'Classes'),
-                  Tab(icon: Icon(Icons.event_outlined), text: 'Exams'),
+                tabs: [
+                  Tab(icon: const Icon(Icons.class_outlined), text: s.classes),
+                  Tab(icon: const Icon(Icons.event_outlined),  text: s.exams),
                 ],
               ),
       ),
@@ -222,10 +225,10 @@ class _ScheduleScreenState extends State<ScheduleScreen>
               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
             ),
           ),
-          const EmptyState(
+          EmptyState(
             icon: Icons.event_available_outlined,
-            title: 'Nothing on this day',
-            subtitle: 'No classes, exams, or deadlines',
+            title: AppStrings.of(context).nothingOnThisDay,
+            subtitle: AppStrings.of(context).nothingSubtitle,
           ),
         ],
       );
@@ -274,11 +277,11 @@ class _ScheduleScreenState extends State<ScheduleScreen>
           children: [
             SubjectDot(color: color, radius: 4),
             const SizedBox(width: 6),
-            Text(subject?.name ?? 'Unknown', style: const TextStyle(fontSize: 12)),
+            Text(subject?.name ?? 'Unknown', style: const TextStyle(fontSize: 13)),
             const SizedBox(width: 8),
-            const Icon(Icons.assignment_outlined, size: 12, color: Colors.grey),
+            const Icon(Icons.assignment_outlined, size: 13, color: Colors.grey),
             const SizedBox(width: 4),
-            const Text('Due', style: TextStyle(fontSize: 12, color: Colors.grey)),
+            const Text('Due', style: TextStyle(fontSize: 13, color: Colors.grey)),
           ],
         ),
         trailing: PriorityBadge(priority: a.priority),
@@ -290,9 +293,9 @@ class _ScheduleScreenState extends State<ScheduleScreen>
   Widget _buildClassTab() {
     final hasAny = _schedules.any((s) => s.type == 'class');
     if (!hasAny) {
-      return const EmptyState(
+      return EmptyState(
         icon: Icons.class_outlined,
-        title: 'No classes scheduled',
+        title: AppStrings.of(context).noClassesScheduled,
       );
     }
     return RefreshIndicator(
@@ -346,7 +349,7 @@ class _ScheduleScreenState extends State<ScheduleScreen>
                           'TODAY',
                           style: TextStyle(
                             color: Colors.white,
-                            fontSize: 9,
+                            fontSize: 11,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
@@ -366,9 +369,9 @@ class _ScheduleScreenState extends State<ScheduleScreen>
   // ── EXAM TAB (list view) ─────────────────────────────────
   Widget _buildExamTab() {
     if (_exams.isEmpty) {
-      return const EmptyState(
+      return EmptyState(
         icon: Icons.event_outlined,
-        title: 'No exams scheduled',
+        title: AppStrings.of(context).noExamsScheduled,
       );
     }
     return RefreshIndicator(
@@ -426,7 +429,7 @@ class _ScheduleScreenState extends State<ScheduleScreen>
                   '$daysLeft d',
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
-                    fontSize: 12,
+                    fontSize: 13,
                     color: daysLeft <= 3 ? AppTheme.danger : AppTheme.warning,
                   ),
                 ),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import '../../core/database/database_helper.dart';
+import '../../core/i18n/app_strings.dart';
 import '../../core/models/assignment.dart';
 import '../../core/models/subject.dart';
 import '../../core/theme/app_theme.dart';
@@ -69,7 +70,8 @@ class _AssignmentScreenState extends State<AssignmentScreen>
   }
 
   Future<void> _delete(Assignment a) async {
-    final ok = await showConfirmDelete(context, title: 'Delete Task', content: 'Delete "${a.title}"?');
+    final str = AppStrings.of(context);
+    final ok = await showConfirmDelete(context, title: str.deleteTask, content: str.deleteTaskBody);
     if (ok) {
       await DatabaseHelper.instance.deleteAssignment(a.id!);
       _loadData();
@@ -78,27 +80,28 @@ class _AssignmentScreenState extends State<AssignmentScreen>
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
     final overdue = _assignments.where((a) => a.isOverdue).length;
     return Scaffold(
       backgroundColor: AppTheme.background,
       appBar: AppBar(
-        title: const Text('Tasks'),
+        title: Text(s.tasks),
         bottom: TabBar(
           controller: _tabCtrl,
-          tabs: const [Tab(text: 'All'), Tab(text: 'Pending'), Tab(text: 'Done')],
+          tabs: [Tab(text: s.tabAll), Tab(text: s.tabPending), Tab(text: s.tabDone)],
         ),
       ),
       body: Column(
         children: [
-          if (overdue > 0) _buildOverdueBanner(overdue),
+          if (overdue > 0) _buildOverdueBanner(overdue, s),
           Expanded(
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : _assignments.isEmpty
                 ? EmptyState(
                     icon: Icons.task_alt_rounded,
-                    title: _filterStatus == null ? 'No tasks yet' : 'No ${_filterStatus} tasks',
-                    subtitle: 'Tap + to add a task',
+                    title: s.noTasksYet,
+                    subtitle: s.noTasksSubtitle,
                   )
                 : _buildList(),
           ),
@@ -116,7 +119,7 @@ class _AssignmentScreenState extends State<AssignmentScreen>
     );
   }
 
-  Widget _buildOverdueBanner(int count) {
+  Widget _buildOverdueBanner(int count, AppStrings s) {
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
@@ -133,7 +136,7 @@ class _AssignmentScreenState extends State<AssignmentScreen>
           const Icon(Icons.warning_rounded, color: AppTheme.danger, size: 18),
           const SizedBox(width: 8),
           Text(
-            '$count overdue task${count > 1 ? 's' : ''} — act now!',
+            '${AppStrings.of(context).overdueAlert(count)} — act now!',
             style: GoogleFonts.nunito(color: AppTheme.danger, fontWeight: FontWeight.w700),
           ),
         ],
@@ -252,7 +255,7 @@ class _AssignmentCard extends StatelessWidget {
                       Expanded(
                         child: Text(
                           subject?.name ?? '',
-                          style: GoogleFonts.nunito(fontSize: 12, color: subjectColor, fontWeight: FontWeight.w600),
+                          style: GoogleFonts.nunito(fontSize: 13, color: subjectColor, fontWeight: FontWeight.w600),
                           maxLines: 1, overflow: TextOverflow.ellipsis,
                         ),
                       ),
@@ -261,13 +264,13 @@ class _AssignmentCard extends StatelessWidget {
                   const SizedBox(height: 4),
                   Row(
                     children: [
-                      Icon(Icons.calendar_today_rounded, size: 11,
+                      Icon(Icons.calendar_today_rounded, size: 13,
                         color: assignment.isOverdue ? AppTheme.danger : Colors.grey.shade400),
                       const SizedBox(width: 4),
                       Text(
                         assignment.isOverdue ? 'Overdue · $deadlineStr' : deadlineStr,
                         style: GoogleFonts.nunito(
-                          fontSize: 11,
+                          fontSize: 13,
                           color: assignment.isOverdue ? AppTheme.danger : Colors.grey.shade400,
                           fontWeight: assignment.isOverdue ? FontWeight.w700 : FontWeight.w500,
                         ),

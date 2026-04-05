@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import '../../core/database/database_helper.dart';
+import '../../core/i18n/app_strings.dart';
 import '../../core/models/assignment.dart';
 import '../../core/models/attendance.dart';
 import '../../core/models/schedule.dart';
@@ -15,7 +16,12 @@ import '../timer/pomodoro_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   final void Function(ThemeMode) onThemeChanged;
-  const DashboardScreen({super.key, required this.onThemeChanged});
+  final void Function(String) onLanguageChanged;
+  const DashboardScreen({
+    super.key,
+    required this.onThemeChanged,
+    required this.onLanguageChanged,
+  });
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
@@ -124,12 +130,13 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
   // ── HERO HEADER ─────────────────────────────────────────
   Widget _buildHeroHeader() {
-    final hour     = DateTime.now().hour;
-    final greeting = hour < 12 ? '☀️ Good morning!'
-                   : hour < 17 ? '🌤️ Good afternoon!'
-                   : '🌙 Good evening!';
-    final today    = DateFormat('EEEE, d MMMM').format(DateTime.now());
-    final overdue  = _pendingTasks.where((a) => a.isOverdue).length;
+    final s       = AppStrings.of(context);
+    final hour    = DateTime.now().hour;
+    final greeting = hour < 12 ? s.greetingMorning
+                   : hour < 17 ? s.greetingAfternoon
+                   : s.greetingEvening;
+    final today   = DateFormat('EEEE, d MMMM').format(DateTime.now());
+    final overdue = _pendingTasks.where((a) => a.isOverdue).length;
 
     return SliverToBoxAdapter(
       child: Stack(
@@ -202,7 +209,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                                 const Icon(Icons.warning_amber_rounded, color: Colors.orangeAccent, size: 14),
                                 const SizedBox(width: 5),
                                 Text(
-                                  '$overdue overdue task${overdue > 1 ? 's' : ''}',
+                                  s.overdueAlert(overdue),
                                   style: GoogleFonts.nunito(
                                     color: Colors.white,
                                     fontSize: 12,
@@ -229,7 +236,10 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                 _iconBtn(Icons.refresh_rounded, _loadData),
                 _iconBtn(Icons.settings_outlined, () async {
                   await Navigator.push(context, _slide(
-                    SettingsScreen(onThemeChanged: widget.onThemeChanged),
+                    SettingsScreen(
+                      onThemeChanged: widget.onThemeChanged,
+                      onLanguageChanged: widget.onLanguageChanged,
+                    ),
                   ));
                   _loadData();
                 }),
@@ -261,11 +271,12 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   }
 
   Widget _buildStatCards() {
+    final s = AppStrings.of(context);
     final overdue = _pendingTasks.where((a) => a.isOverdue).length;
     return Row(
       children: [
         StatCard(
-          label: 'Subjects',
+          label: s.statSubjects,
           value: '${_subjects.length}',
           icon: Icons.menu_book_rounded,
           color: AppTheme.primary,
@@ -276,14 +287,14 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         ),
         const SizedBox(width: 10),
         StatCard(
-          label: 'Pending',
+          label: s.statPending,
           value: '${_pendingTasks.length}',
           icon: Icons.assignment_rounded,
           color: AppTheme.warning,
         ),
         const SizedBox(width: 10),
         StatCard(
-          label: 'Overdue',
+          label: s.statOverdue,
           value: '$overdue',
           icon: Icons.warning_rounded,
           color: overdue > 0 ? AppTheme.danger : Colors.grey,
@@ -294,6 +305,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
   // ── BODY ─────────────────────────────────────────────────
   Widget _buildBody() {
+    final s = AppStrings.of(context);
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 66, 16, 100),
       child: Column(
@@ -307,19 +319,19 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
           // Today's Classes
           if (_todayClasses.isNotEmpty) ...[
-            SectionHeader(title: "Today's Classes", icon: Icons.class_rounded, color: AppTheme.teal),
+            SectionHeader(title: s.todayClasses, icon: Icons.class_rounded, color: AppTheme.teal),
             ..._todayClasses.map(_buildClassCard),
             const SizedBox(height: 24),
           ],
 
           // Pending Tasks
           SectionHeader(
-            title: 'Pending Tasks (${_pendingTasks.length})',
+            title: s.pendingTasksHeader(_pendingTasks.length),
             icon: Icons.task_alt_rounded,
             color: AppTheme.warning,
           ),
           if (_pendingTasks.isEmpty)
-            _buildSuccessBanner('All tasks done! 🎉')
+            _buildSuccessBanner(s.allTasksDone)
           else
             ..._pendingTasks.take(5).map(_buildTaskCard),
           if (_pendingTasks.length > 5)
@@ -327,7 +339,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
               padding: const EdgeInsets.symmetric(vertical: 6),
               child: Center(
                 child: Text(
-                  '+${_pendingTasks.length - 5} more tasks',
+                  s.moreTasks(_pendingTasks.length - 5),
                   style: GoogleFonts.nunito(color: Colors.grey.shade400, fontSize: 13),
                 ),
               ),
@@ -336,7 +348,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           // Upcoming Exams
           if (_upcomingExams.isNotEmpty) ...[
             const SizedBox(height: 24),
-            SectionHeader(title: 'Upcoming Exams', icon: Icons.event_rounded, color: AppTheme.danger),
+            SectionHeader(title: s.upcomingExams, icon: Icons.event_rounded, color: AppTheme.danger),
             ..._upcomingExams.map(_buildExamCard),
           ],
         ],
@@ -346,19 +358,20 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
   // ── QUICK ACTIONS ────────────────────────────────────────
   Widget _buildQuickActions() {
+    final s = AppStrings.of(context);
     return Row(
       children: [
         _buildActionTile(
           gradient: AppTheme.pinkGradient,
           icon: Icons.timer_rounded,
-          label: 'Pomodoro',
+          label: s.actionPomodoro,
           onTap: () => Navigator.push(context, _slide(const PomodoroScreen())),
         ),
         const SizedBox(width: 10),
         _buildActionTile(
           gradient: AppTheme.tealGradient,
           icon: Icons.fact_check_rounded,
-          label: 'Attendance',
+          label: s.actionAttendance,
           onTap: () async {
             await Navigator.push(context, _slide(AttendanceScreen(subjects: _subjects)));
             _loadData();
@@ -368,7 +381,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         _buildActionTile(
           gradient: AppTheme.primaryGradient,
           icon: Icons.menu_book_rounded,
-          label: 'Subjects',
+          label: s.actionSubjects,
           onTap: () async {
             await Navigator.push(context, _slide(const SubjectScreen()));
             _loadData();
@@ -408,7 +421,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                 label,
                 style: GoogleFonts.nunito(
                   color: Colors.white,
-                  fontSize: 11,
+                  fontSize: 13,
                   fontWeight: FontWeight.w700,
                 ),
               ),
@@ -421,13 +434,14 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
   // ── ATTENDANCE SECTION ────────────────────────────────────
   List<Widget> _buildAttendanceSection() {
+    final str = AppStrings.of(context);
     final lowList = _subjects
         .where((s) => (_attendanceRates[s.id] ?? 1.0) < 0.75 && (_attendanceRates[s.id] ?? -1) >= 0)
         .toList();
     if (lowList.isEmpty) return [];
 
     return [
-      SectionHeader(title: 'Attendance Alert', icon: Icons.warning_amber_rounded, color: AppTheme.danger),
+      SectionHeader(title: str.attendanceAlert, icon: Icons.warning_amber_rounded, color: AppTheme.danger),
       ...lowList.map((s) {
         final rate = _attendanceRates[s.id!] ?? 0.0;
         final pct  = (rate * 100).toStringAsFixed(0);
@@ -452,8 +466,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(s.name, style: GoogleFonts.nunito(fontWeight: FontWeight.w700)),
-                    Text('Attendance: $pct% — below 75%',
-                      style: GoogleFonts.nunito(color: AppTheme.danger, fontSize: 12, fontWeight: FontWeight.w600)),
+                    Text(str.attendancePct(pct),
+                      style: GoogleFonts.nunito(color: AppTheme.danger, fontSize: 13, fontWeight: FontWeight.w600)),
                   ],
                 ),
               ),
@@ -511,7 +525,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         title: Text(subject?.name ?? 'Unknown', style: GoogleFonts.nunito(fontWeight: FontWeight.w700)),
         subtitle: Text(
           '${s.startTime} – ${s.endTime}${s.room.isNotEmpty ? '  ·  ${s.room}' : ''}',
-          style: GoogleFonts.nunito(fontSize: 12, color: Colors.grey.shade500),
+          style: GoogleFonts.nunito(fontSize: 13, color: Colors.grey.shade500),
         ),
         trailing: Container(
           padding: const EdgeInsets.all(8),
@@ -564,7 +578,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                       const SizedBox(width: 5),
                       Expanded(
                         child: Text(subject?.name ?? '',
-                          style: GoogleFonts.nunito(fontSize: 12, color: subjectColor, fontWeight: FontWeight.w600),
+                          style: GoogleFonts.nunito(fontSize: 13, color: subjectColor, fontWeight: FontWeight.w600),
                           maxLines: 1, overflow: TextOverflow.ellipsis),
                       ),
                     ],
@@ -580,12 +594,12 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                 const SizedBox(height: 4),
                 Row(
                   children: [
-                    Icon(Icons.calendar_today_rounded, size: 10,
+                    Icon(Icons.calendar_today_rounded, size: 13,
                       color: a.isOverdue ? AppTheme.danger : Colors.grey.shade400),
                     const SizedBox(width: 3),
                     Text(deadlineStr,
                       style: GoogleFonts.nunito(
-                        fontSize: 11,
+                        fontSize: 13,
                         color: a.isOverdue ? AppTheme.danger : Colors.grey.shade400,
                         fontWeight: a.isOverdue ? FontWeight.w700 : FontWeight.w500,
                       )),
@@ -627,7 +641,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         title: Text(subject?.name ?? 'Unknown', style: GoogleFonts.nunito(fontWeight: FontWeight.w700)),
         subtitle: Text(
           '${s.date}  ·  ${s.startTime}${s.room.isNotEmpty ? '  ·  ${s.room}' : ''}',
-          style: GoogleFonts.nunito(fontSize: 12, color: Colors.grey.shade500),
+          style: GoogleFonts.nunito(fontSize: 13, color: Colors.grey.shade500),
         ),
         trailing: Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -643,7 +657,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                   fontSize: 18, fontWeight: FontWeight.w800,
                   color: isUrgent ? AppTheme.danger : AppTheme.warning,
                 )),
-              Text('days', style: GoogleFonts.nunito(fontSize: 10, color: Colors.grey.shade400)),
+              Text('days', style: GoogleFonts.nunito(fontSize: 13, color: Colors.grey.shade400)),
             ],
           ),
         ),

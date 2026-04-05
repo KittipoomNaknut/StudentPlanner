@@ -173,7 +173,7 @@ class _GradeDetailScreenState extends State<GradeDetailScreen> {
 
   Widget _stat(String label, String value) => Column(children: [
     Text(value, style: GoogleFonts.nunito(fontSize: 20, fontWeight: FontWeight.w800, color: Colors.white)),
-    Text(label, style: GoogleFonts.nunito(color: Colors.white70, fontSize: 11)),
+    Text(label, style: GoogleFonts.nunito(color: Colors.white70, fontSize: 13)),
   ]);
 
   Widget _buildGradeList(Color subjectColor) {
@@ -196,7 +196,7 @@ class _GradeDetailScreenState extends State<GradeDetailScreen> {
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(type[0].toUpperCase() + type.substring(1),
-                  style: GoogleFonts.nunito(color: subjectColor, fontWeight: FontWeight.w700, fontSize: 12)),
+                  style: GoogleFonts.nunito(color: subjectColor, fontWeight: FontWeight.w700, fontSize: 13)),
               ),
             ]),
           ),
@@ -225,7 +225,7 @@ class _GradeDetailScreenState extends State<GradeDetailScreen> {
               Text(g.name, style: GoogleFonts.nunito(fontWeight: FontWeight.w700)),
               const SizedBox(height: 4),
               Text('${g.score} / ${g.maxScore}${g.weight != 1.0 ? '  ·  ×${g.weight}' : ''}',
-                style: GoogleFonts.nunito(color: Colors.grey.shade400, fontSize: 12)),
+                style: GoogleFonts.nunito(color: Colors.grey.shade400, fontSize: 13)),
               const SizedBox(height: 6),
               ClipRRect(
                 borderRadius: BorderRadius.circular(4),
@@ -242,7 +242,7 @@ class _GradeDetailScreenState extends State<GradeDetailScreen> {
             Text('${pct.toStringAsFixed(1)}%',
               style: GoogleFonts.nunito(fontWeight: FontWeight.w800, color: pctColor, fontSize: 16)),
             Text(GradeUtils.letterGrade(pct),
-              style: GoogleFonts.nunito(color: Colors.grey.shade400, fontSize: 12)),
+              style: GoogleFonts.nunito(color: Colors.grey.shade400, fontSize: 13)),
           ]),
           PopupMenuButton<String>(
             icon: Icon(Icons.more_vert, color: Colors.grey.shade300, size: 18),
