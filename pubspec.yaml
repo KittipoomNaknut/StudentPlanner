@@ -38,11 +38,21 @@ dependencies:
   flutter_colorpicker: ^1.0.3
   table_calendar: ^3.1.0
   timezone: ^0.9.4
+  flutter_launcher_icons: ^0.14.3
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
   path: ^1.9.1
+
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: true
+  image_path: "assets/logo.png"
+  # Optional: For Android Adaptive Icons
+  adaptive_icon_background: "#ffffff"
+  adaptive_icon_foreground: "assets/logo_foreground.png"
+
 
 dev_dependencies:
   flutter_test:

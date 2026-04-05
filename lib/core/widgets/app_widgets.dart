@@ -29,7 +29,11 @@ class EmptyState extends StatelessWidget {
                 color: AppTheme.primary.withValues(alpha: 0.08),
                 shape: BoxShape.circle,
               ),
-              child: Icon(icon, size: 48, color: AppTheme.primary.withValues(alpha: 0.5)),
+              child: Icon(
+                icon,
+                size: 48,
+                color: AppTheme.primary.withValues(alpha: 0.5),
+              ),
             ),
             const SizedBox(height: 20),
             Text(
@@ -116,7 +120,7 @@ class SectionHeader extends StatelessWidget {
               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
             ),
           ),
-          if (trailing != null) trailing!,
+          ?trailing,
         ],
       ),
     );
@@ -179,7 +183,10 @@ class StatCard extends StatelessWidget {
               ),
               Text(
                 label,
-                style: TextStyle(fontSize: 11, color: color.withValues(alpha: 0.8)),
+                style: TextStyle(
+                  fontSize: 11,
+                  color: color.withValues(alpha: 0.8),
+                ),
                 textAlign: TextAlign.center,
               ),
             ],

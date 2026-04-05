@@ -105,7 +105,9 @@ class _AssignmentScreenState extends State<AssignmentScreen> {
                     Icon(
                       Icons.radio_button_unchecked,
                       size: 18,
-                      color: _filterStatus == 'pending' ? AppTheme.primary : null,
+                      color: _filterStatus == 'pending'
+                          ? AppTheme.primary
+                          : null,
                     ),
                     const SizedBox(width: 8),
                     const Text('Pending'),
@@ -141,7 +143,7 @@ class _AssignmentScreenState extends State<AssignmentScreen> {
                           icon: Icons.assignment_outlined,
                           title: _filterStatus == null
                               ? 'No tasks yet'
-                              : 'No ${_filterStatus} tasks',
+                              : 'No $_filterStatus tasks',
                           subtitle: 'Tap + to add a task',
                         )
                       : _buildList(),
@@ -308,7 +310,9 @@ class _AssignmentCard extends StatelessWidget {
                         : deadlineStr,
                     style: TextStyle(
                       fontSize: 12,
-                      color: assignment.isOverdue ? AppTheme.danger : Colors.grey,
+                      color: assignment.isOverdue
+                          ? AppTheme.danger
+                          : Colors.grey,
                       fontWeight: assignment.isOverdue
                           ? FontWeight.bold
                           : FontWeight.normal,

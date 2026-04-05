@@ -195,7 +195,7 @@ class _PomodoroScreenState extends State<PomodoroScreen>
             // Timer ring
             AnimatedBuilder(
               animation: _pulseAnimation,
-              builder: (_, __) => Transform.scale(
+              builder: (_, _) => Transform.scale(
                 scale: _isRunning ? _pulseAnimation.value : 1.0,
                 child: SizedBox(
                   width: 240,
@@ -210,7 +210,9 @@ class _PomodoroScreenState extends State<PomodoroScreen>
                           value: _progress,
                           strokeWidth: 12,
                           backgroundColor: _phaseColor.withValues(alpha: 0.15),
-                          valueColor: AlwaysStoppedAnimation<Color>(_phaseColor),
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            _phaseColor,
+                          ),
                           strokeCap: StrokeCap.round,
                         ),
                       ),
@@ -325,11 +327,7 @@ class _PomodoroScreenState extends State<PomodoroScreen>
     );
   }
 
-  Widget _buildPhaseChip(
-    String label,
-    PomodoroPhase phase,
-    int minutes,
-  ) {
+  Widget _buildPhaseChip(String label, PomodoroPhase phase, int minutes) {
     final isSelected = _phase == phase;
     final color = _phaseColor;
     return GestureDetector(

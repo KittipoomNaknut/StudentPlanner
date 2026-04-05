@@ -80,7 +80,9 @@ class _ScheduleScreenState extends State<ScheduleScreen>
     final events = <dynamic>[];
 
     // Exams on this date
-    events.addAll(_schedules.where((s) => s.type == 'exam' && s.date == dateStr));
+    events.addAll(
+      _schedules.where((s) => s.type == 'exam' && s.date == dateStr),
+    );
 
     // Assignments due on this date
     events.addAll(_assignments.where((a) => a.deadline == dateStr));
@@ -148,8 +150,7 @@ class _ScheduleScreenState extends State<ScheduleScreen>
             MaterialPageRoute(
               builder: (_) => AddScheduleScreen(
                 subjects: _subjects,
-                initialType:
-                    _showCalendar || _tabController.index == 0
+                initialType: _showCalendar || _tabController.index == 0
                     ? 'class'
                     : 'exam',
               ),
@@ -177,7 +178,10 @@ class _ScheduleScreenState extends State<ScheduleScreen>
           headerStyle: const HeaderStyle(
             formatButtonVisible: false,
             titleCentered: true,
-            titleTextStyle: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            titleTextStyle: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 16,
+            ),
           ),
           calendarStyle: CalendarStyle(
             todayDecoration: BoxDecoration(
@@ -274,11 +278,17 @@ class _ScheduleScreenState extends State<ScheduleScreen>
           children: [
             SubjectDot(color: color, radius: 4),
             const SizedBox(width: 6),
-            Text(subject?.name ?? 'Unknown', style: const TextStyle(fontSize: 12)),
+            Text(
+              subject?.name ?? 'Unknown',
+              style: const TextStyle(fontSize: 12),
+            ),
             const SizedBox(width: 8),
             const Icon(Icons.assignment_outlined, size: 12, color: Colors.grey),
             const SizedBox(width: 4),
-            const Text('Due', style: TextStyle(fontSize: 12, color: Colors.grey)),
+            const Text(
+              'Due',
+              style: TextStyle(fontSize: 12, color: Colors.grey),
+            ),
           ],
         ),
         trailing: PriorityBadge(priority: a.priority),
@@ -309,14 +319,19 @@ class _ScheduleScreenState extends State<ScheduleScreen>
             children: [
               Container(
                 margin: const EdgeInsets.fromLTRB(16, 16, 16, 6),
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
                   color: isToday
                       ? AppTheme.primary.withValues(alpha: 0.1)
                       : Colors.transparent,
                   borderRadius: BorderRadius.circular(8),
                   border: isToday
-                      ? Border.all(color: AppTheme.primary.withValues(alpha: 0.3))
+                      ? Border.all(
+                          color: AppTheme.primary.withValues(alpha: 0.3),
+                        )
                       : null,
                 ),
                 child: Row(
@@ -326,7 +341,9 @@ class _ScheduleScreenState extends State<ScheduleScreen>
                       AppConstants.days[dayIndex],
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
-                        color: isToday ? AppTheme.primary : Colors.grey.shade600,
+                        color: isToday
+                            ? AppTheme.primary
+                            : Colors.grey.shade600,
                         fontSize: 13,
                         letterSpacing: 0.5,
                       ),
@@ -383,13 +400,12 @@ class _ScheduleScreenState extends State<ScheduleScreen>
 
   Widget _buildScheduleCard(Schedule s) {
     final subject = _getSubject(s.subjectId);
-    final color =
-        subject != null ? AppTheme.fromHex(subject.color) : Colors.grey;
+    final color = subject != null
+        ? AppTheme.fromHex(subject.color)
+        : Colors.grey;
     final isExam = s.type == 'exam';
     final examDate = isExam ? DateTime.tryParse(s.date ?? '') : null;
-    final daysLeft = examDate != null
-        ? examDate.difference(DateTime.now()).inDays
-        : null;
+    final daysLeft = examDate?.difference(DateTime.now()).inDays;
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
