@@ -121,7 +121,7 @@ class _GradeDetailScreenState extends State<GradeDetailScreen> {
               ),
               const SizedBox(height: 12),
               DropdownButtonFormField<String>(
-                value: type,
+                initialValue: type,
                 decoration: const InputDecoration(
                   labelText: 'Type',
                   prefixIcon: Icon(Icons.category_outlined),
@@ -143,8 +143,7 @@ class _GradeDetailScreenState extends State<GradeDetailScreen> {
                   onPressed: () async {
                     final name = nameCtrl.text.trim();
                     final score = double.tryParse(scoreCtrl.text) ?? 0;
-                    final maxScore =
-                        double.tryParse(maxScoreCtrl.text) ?? 100;
+                    final maxScore = double.tryParse(maxScoreCtrl.text) ?? 100;
                     final weight = double.tryParse(weightCtrl.text) ?? 1.0;
                     if (name.isEmpty) return;
 
@@ -229,12 +228,7 @@ class _GradeDetailScreenState extends State<GradeDetailScreen> {
     );
   }
 
-  Widget _buildHeader(
-    Color color,
-    double score,
-    String letter,
-    double gp,
-  ) {
+  Widget _buildHeader(Color color, double score, String letter, double gp) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
@@ -262,11 +256,8 @@ class _GradeDetailScreenState extends State<GradeDetailScreen> {
     );
   }
 
-  Widget _buildDivider() => Container(
-    width: 1,
-    height: 30,
-    color: Colors.white24,
-  );
+  Widget _buildDivider() =>
+      Container(width: 1, height: 30, color: Colors.white24);
 
   Widget _buildStat(String label, String value) {
     return Column(
@@ -295,9 +286,7 @@ class _GradeDetailScreenState extends State<GradeDetailScreen> {
     }
     final order = ['midterm', 'final', 'project', 'quiz', 'homework'];
     final sortedTypes = grouped.keys.toList()
-      ..sort(
-        (a, b) => order.indexOf(a).compareTo(order.indexOf(b)),
-      );
+      ..sort((a, b) => order.indexOf(a).compareTo(order.indexOf(b)));
 
     return ListView(
       padding: const EdgeInsets.only(bottom: 80),
@@ -343,10 +332,7 @@ class _GradeDetailScreenState extends State<GradeDetailScreen> {
                   Text(
                     '${g.score} / ${g.maxScore}'
                     '${g.weight != 1.0 ? '  ·  weight ${g.weight}' : ''}',
-                    style: TextStyle(
-                      color: Colors.grey.shade500,
-                      fontSize: 12,
-                    ),
+                    style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
                   ),
                   const SizedBox(height: 6),
                   ClipRRect(

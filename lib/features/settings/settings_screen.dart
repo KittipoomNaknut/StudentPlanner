@@ -157,13 +157,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
             margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
             child: SwitchListTile(
               title: const Text('Deadline Reminders'),
-              subtitle: const Text(
-                'Get notified before assignment deadlines',
-              ),
+              subtitle: const Text('Get notified before assignment deadlines'),
               secondary: const Icon(Icons.notifications_outlined),
               value: _notificationsEnabled,
               onChanged: _toggleNotifications,
-              activeColor: AppTheme.primary,
+              activeThumbColor: AppTheme.primary,
             ),
           ),
 
@@ -182,9 +180,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     )
                   : const Icon(Icons.upload_outlined),
               title: const Text('Export Data'),
-              subtitle: const Text(
-                'Copy all data as JSON to clipboard',
-              ),
+              subtitle: const Text('Copy all data as JSON to clipboard'),
               trailing: const Icon(Icons.chevron_right),
               onTap: _isExporting ? null : _exportData,
             ),

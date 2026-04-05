@@ -68,10 +68,11 @@ class _AddScheduleScreenState extends State<AddScheduleScreen> {
           '${picked.hour.toString().padLeft(2, '0')}:'
           '${picked.minute.toString().padLeft(2, '0')}';
       setState(() {
-        if (isStart)
+        if (isStart) {
           _startTime = str;
-        else
+        } else {
           _endTime = str;
+        }
       });
     }
   }
@@ -158,7 +159,7 @@ class _AddScheduleScreenState extends State<AddScheduleScreen> {
 
             // ── Subject ──────────────────────────────
             DropdownButtonFormField<int>(
-              value: _selectedSubjectId,
+              initialValue: _selectedSubjectId,
               decoration: const InputDecoration(
                 labelText: 'Subject *',
                 prefixIcon: Icon(Icons.book_outlined),

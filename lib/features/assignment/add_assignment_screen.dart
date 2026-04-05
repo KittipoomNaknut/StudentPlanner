@@ -126,7 +126,7 @@ class _AddAssignmentScreenState extends State<AddAssignmentScreen> {
 
             // ── Subject Dropdown ─────────────────────
             DropdownButtonFormField<int>(
-              value: _selectedSubjectId,
+              initialValue: _selectedSubjectId,
               decoration: const InputDecoration(
                 labelText: 'Subject *',
                 prefixIcon: Icon(Icons.book_outlined),
