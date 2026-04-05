@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../core/database/database_helper.dart';
 import '../../core/models/note.dart';
 import '../../core/models/subject.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/widgets/app_widgets.dart';
 import 'note_detail_screen.dart';
 
 class NoteScreen extends StatefulWidget {
@@ -18,6 +20,9 @@ class _NoteScreenState extends State<NoteScreen> {
   List<Subject> _subjects = [];
   bool _isLoading = true;
   String _searchQuery = '';
+  Timer? _debounce;
+  int? _filterSubjectId;
+  final _searchCtrl = TextEditingController();
 
   @override
   void initState() {
@@ -25,14 +30,34 @@ class _NoteScreenState extends State<NoteScreen> {
     _loadData();
   }
 
-  Future<void> _loadData() async {
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadData({String? search}) async {
     setState(() => _isLoading = true);
-    final notes = await DatabaseHelper.instance.getNotes();
-    final subjects = await DatabaseHelper.instance.getSubjects();
+    final results = await Future.wait([
+      DatabaseHelper.instance.getNotes(
+        subjectId: _filterSubjectId,
+        search: search?.isEmpty == true ? null : search,
+      ),
+      DatabaseHelper.instance.getSubjects(),
+    ]);
     setState(() {
-      _notes = notes;
-      _subjects = subjects;
+      _notes = results[0] as List<Note>;
+      _subjects = results[1] as List<Subject>;
       _isLoading = false;
+    });
+  }
+
+  void _onSearchChanged(String query) {
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 400), () {
+      setState(() => _searchQuery = query);
+      _loadData(search: query);
     });
   }
 
@@ -44,107 +69,104 @@ class _NoteScreenState extends State<NoteScreen> {
     }
   }
 
-  // Client-side filter
-  List<Note> get _filteredNotes {
-    if (_searchQuery.isEmpty) return _notes;
-    final q = _searchQuery.toLowerCase();
-    return _notes
-        .where(
-          (n) =>
-              n.title.toLowerCase().contains(q) ||
-              n.content.toLowerCase().contains(q),
-        )
-        .toList();
-  }
-
   Future<void> _deleteNote(Note note) async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Delete Note'),
-        content: Text('Delete "${note.title}"?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: TextButton.styleFrom(foregroundColor: AppTheme.danger),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
+    final confirmed = await showConfirmDelete(
+      context,
+      title: 'Delete Note',
+      content: 'Delete "${note.title}"?',
     );
-    if (confirm == true) {
+    if (confirmed) {
       await DatabaseHelper.instance.deleteNote(note.id!);
-      _loadData();
+      _loadData(search: _searchQuery.isEmpty ? null : _searchQuery);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Notes')),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : Column(
-              children: [
-                // Search Bar
-                Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: TextField(
-                    decoration: InputDecoration(
-                      hintText: 'Search notes...',
-                      prefixIcon: const Icon(Icons.search),
-                      suffixIcon: _searchQuery.isNotEmpty
-                          ? IconButton(
-                              icon: const Icon(Icons.clear),
-                              onPressed: () =>
-                                  setState(() => _searchQuery = ''),
-                            )
-                          : null,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
+      appBar: AppBar(
+        title: const Text('Notes'),
+        actions: [
+          if (_filterSubjectId != null)
+            IconButton(
+              icon: const Icon(Icons.filter_list_off),
+              tooltip: 'Clear filter',
+              onPressed: () {
+                setState(() => _filterSubjectId = null);
+                _loadData(search: _searchQuery.isEmpty ? null : _searchQuery);
+              },
+            ),
+          PopupMenuButton<int?>(
+            icon: const Icon(Icons.filter_list),
+            tooltip: 'Filter by subject',
+            onSelected: (id) {
+              setState(() => _filterSubjectId = id);
+              _loadData(search: _searchQuery.isEmpty ? null : _searchQuery);
+            },
+            itemBuilder: (_) => [
+              const PopupMenuItem(value: null, child: Text('All Subjects')),
+              ..._subjects.map(
+                (s) => PopupMenuItem(
+                  value: s.id,
+                  child: Row(
+                    children: [
+                      CircleAvatar(
+                        backgroundColor: AppTheme.fromHex(s.color),
+                        radius: 6,
                       ),
-                      contentPadding: const EdgeInsets.symmetric(vertical: 0),
-                    ),
-                    onChanged: (v) => setState(() => _searchQuery = v),
+                      const SizedBox(width: 8),
+                      Text(s.name),
+                    ],
                   ),
                 ),
-
-                // Note List
-                Expanded(
-                  child: _filteredNotes.isEmpty
-                      ? _buildEmptyState()
-                      : ListView.builder(
-                          padding: const EdgeInsets.only(bottom: 80),
-                          itemCount: _filteredNotes.length,
-                          itemBuilder: (context, index) {
-                            final note = _filteredNotes[index];
-                            final subject = _getSubject(note.subjectId);
-                            return _NoteCard(
-                              note: note,
-                              subject: subject,
-                              onTap: () async {
-                                await Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => NoteDetailScreen(
-                                      note: note,
-                                      subjects: _subjects,
-                                    ),
-                                  ),
-                                );
-                                _loadData();
-                              },
-                              onDelete: () => _deleteNote(note),
-                            );
-                          },
-                        ),
+              ),
+            ],
+          ),
+        ],
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(60),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+            child: TextField(
+              controller: _searchCtrl,
+              onChanged: _onSearchChanged,
+              style: const TextStyle(color: Colors.white),
+              decoration: InputDecoration(
+                hintText: 'Search notes…',
+                hintStyle: const TextStyle(color: Colors.white54),
+                prefixIcon: const Icon(Icons.search, color: Colors.white54),
+                suffixIcon: _searchCtrl.text.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear, color: Colors.white54),
+                        onPressed: () {
+                          _searchCtrl.clear();
+                          _onSearchChanged('');
+                        },
+                      )
+                    : null,
+                filled: true,
+                fillColor: Colors.white.withValues(alpha: 0.15),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide.none,
                 ),
-              ],
+                contentPadding: const EdgeInsets.symmetric(vertical: 10),
+              ),
             ),
+          ),
+        ),
+      ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _notes.isEmpty
+          ? EmptyState(
+              icon: Icons.note_outlined,
+              title: _searchQuery.isNotEmpty ? 'No notes found' : 'No notes yet',
+              subtitle: _searchQuery.isNotEmpty
+                  ? 'Try a different search'
+                  : 'Tap + to create a note',
+            )
+          : _buildNoteGrid(),
       floatingActionButton: FloatingActionButton(
         onPressed: () async {
           await Navigator.push(
@@ -153,39 +175,51 @@ class _NoteScreenState extends State<NoteScreen> {
               builder: (_) => NoteDetailScreen(subjects: _subjects),
             ),
           );
-          _loadData();
+          _loadData(search: _searchQuery.isEmpty ? null : _searchQuery);
         },
         child: const Icon(Icons.add),
       ),
     );
   }
 
-  Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.note_outlined, size: 80, color: Colors.grey.shade400),
-          const SizedBox(height: 16),
-          Text(
-            _searchQuery.isNotEmpty
-                ? 'No results for "$_searchQuery"'
-                : 'No notes yet',
-            style: TextStyle(fontSize: 18, color: Colors.grey.shade600),
-          ),
-          const SizedBox(height: 8),
-          if (_searchQuery.isEmpty)
-            Text(
-              'Tap + to create your first note',
-              style: TextStyle(color: Colors.grey.shade500),
-            ),
-        ],
+  Widget _buildNoteGrid() {
+    return RefreshIndicator(
+      onRefresh: () => _loadData(search: _searchQuery.isEmpty ? null : _searchQuery),
+      child: GridView.builder(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+          crossAxisSpacing: 12,
+          mainAxisSpacing: 12,
+          childAspectRatio: 0.85,
+        ),
+        itemCount: _notes.length,
+        itemBuilder: (context, index) {
+          final note = _notes[index];
+          final subject = _getSubject(note.subjectId);
+          return _NoteCard(
+            note: note,
+            subject: subject,
+            onTap: () async {
+              await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => NoteDetailScreen(
+                    subjects: _subjects,
+                    note: note,
+                  ),
+                ),
+              );
+              _loadData(search: _searchQuery.isEmpty ? null : _searchQuery);
+            },
+            onDelete: () => _deleteNote(note),
+          );
+        },
       ),
     );
   }
 }
 
-// ── NOTE CARD ─────────────────────────────────────────────
 class _NoteCard extends StatelessWidget {
   final Note note;
   final Subject? subject;
@@ -201,64 +235,103 @@ class _NoteCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final subjectColor = subject != null
+    final color = subject != null
         ? AppTheme.fromHex(subject!.color)
-        : Colors.grey;
-    final updatedAt = DateTime.tryParse(note.updatedAt);
-    final dateStr = updatedAt != null
-        ? DateFormat('dd MMM yyyy, HH:mm').format(updatedAt)
+        : Colors.blueGrey;
+    final updatedDate = DateTime.tryParse(note.updatedAt);
+    final dateStr = updatedDate != null
+        ? DateFormat('d MMM').format(updatedDate)
         : '';
 
-    return Card(
-      child: ListTile(
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      clipBehavior: Clip.antiAlias,
+      elevation: 0,
+      child: InkWell(
         onTap: onTap,
-        leading: CircleAvatar(
-          backgroundColor: subjectColor.withValues(alpha: 0.15),
-          child: Icon(Icons.note, color: subjectColor),
-        ),
-        title: Text(
-          note.title,
-          style: const TextStyle(fontWeight: FontWeight.bold),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-        subtitle: Column(
+        child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (note.content.isNotEmpty)
-              Text(
-                note.content,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
-              ),
-            const SizedBox(height: 4),
-            Row(
-              children: [
-                if (subject != null) ...[
-                  CircleAvatar(backgroundColor: subjectColor, radius: 4),
-                  const SizedBox(width: 4),
-                  Text(
-                    subject!.name,
-                    style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
-                  ),
-                  const SizedBox(width: 8),
-                ],
-                Icon(Icons.access_time, size: 11, color: Colors.grey.shade400),
-                const SizedBox(width: 2),
-                Text(
-                  dateStr,
-                  style: TextStyle(fontSize: 11, color: Colors.grey.shade400),
+            // Color header bar
+            Container(
+              height: 6,
+              color: color,
+            ),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(12, 10, 8, 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            note.title,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        GestureDetector(
+                          onTap: onDelete,
+                          child: Icon(
+                            Icons.more_vert,
+                            size: 18,
+                            color: Colors.grey.shade400,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Expanded(
+                      child: Text(
+                        note.content,
+                        style: TextStyle(
+                          color: Colors.grey.shade500,
+                          fontSize: 12,
+                          height: 1.4,
+                        ),
+                        maxLines: 4,
+                        overflow: TextOverflow.fade,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        SubjectDot(color: color, radius: 4),
+                        const SizedBox(width: 5),
+                        Expanded(
+                          child: Text(
+                            subject?.name ?? 'Unknown',
+                            style: TextStyle(
+                              color: color,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        Text(
+                          dateStr,
+                          style: TextStyle(
+                            color: Colors.grey.shade400,
+                            fontSize: 10,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ],
         ),
-        trailing: IconButton(
-          icon: const Icon(Icons.delete_outline, color: Colors.red),
-          onPressed: onDelete,
-        ),
-        isThreeLine: true,
       ),
     );
   }

@@ -1,10 +1,12 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../../features/notification/notification_service.dart';
+import '../../core/database/database_helper.dart';
+import '../../core/theme/app_theme.dart';
 
 class SettingsScreen extends StatefulWidget {
   final void Function(ThemeMode) onThemeChanged;
-
   const SettingsScreen({super.key, required this.onThemeChanged});
 
   @override
@@ -13,45 +15,93 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   ThemeMode _themeMode = ThemeMode.system;
-  bool _notifEnabled = true;
+  bool _notificationsEnabled = true;
+  bool _isExporting = false;
 
   @override
   void initState() {
     super.initState();
-    _loadSettings();
+    _loadPrefs();
   }
 
-  Future<void> _loadSettings() async {
+  Future<void> _loadPrefs() async {
     final prefs = await SharedPreferences.getInstance();
-    final theme = prefs.getString('theme_mode') ?? 'system';
-    final notif = prefs.getBool('notifications_enabled') ?? true;
     setState(() {
-      _themeMode = theme == 'dark'
-          ? ThemeMode.dark
-          : theme == 'light'
+      _notificationsEnabled = prefs.getBool('notifications_enabled') ?? true;
+      final saved = prefs.getString('theme_mode') ?? 'system';
+      _themeMode = saved == 'light'
           ? ThemeMode.light
+          : saved == 'dark'
+          ? ThemeMode.dark
           : ThemeMode.system;
-      _notifEnabled = notif;
     });
   }
 
   Future<void> _setTheme(ThemeMode mode) async {
     final prefs = await SharedPreferences.getInstance();
-    final key = mode == ThemeMode.dark
-        ? 'dark'
-        : mode == ThemeMode.light
+    final key = mode == ThemeMode.light
         ? 'light'
+        : mode == ThemeMode.dark
+        ? 'dark'
         : 'system';
     await prefs.setString('theme_mode', key);
     setState(() => _themeMode = mode);
     widget.onThemeChanged(mode);
   }
 
-  Future<void> _setNotifications(bool enabled) async {
+  Future<void> _toggleNotifications(bool val) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('notifications_enabled', enabled);
-    setState(() => _notifEnabled = enabled);
-    if (!enabled) await NotificationService.instance.cancelAll();
+    await prefs.setBool('notifications_enabled', val);
+    setState(() => _notificationsEnabled = val);
+  }
+
+  Future<void> _exportData() async {
+    setState(() => _isExporting = true);
+    try {
+      final data = await DatabaseHelper.instance.exportAll();
+      final jsonStr = const JsonEncoder.withIndent('  ').convert(data);
+
+      await Clipboard.setData(ClipboardData(text: jsonStr));
+
+      if (mounted) {
+        setState(() => _isExporting = false);
+        showDialog(
+          context: context,
+          builder: (_) => AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            title: const Row(
+              children: [
+                Icon(Icons.check_circle, color: AppTheme.success),
+                SizedBox(width: 10),
+                Text('Data Exported'),
+              ],
+            ),
+            content: const Text(
+              'Your data has been copied to the clipboard as JSON.\n\n'
+              'You can paste it into any text editor or document to save it.',
+            ),
+            actions: [
+              FilledButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+        );
+      }
+    } catch (e) {
+      setState(() => _isExporting = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Export failed: $e'),
+            backgroundColor: AppTheme.danger,
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -60,91 +110,125 @@ class _SettingsScreenState extends State<SettingsScreen> {
       appBar: AppBar(title: const Text('Settings')),
       body: ListView(
         children: [
-          // ── Appearance ─────────────────────────────
-          const _SectionHeader('Appearance'),
-          RadioListTile<ThemeMode>(
-            title: const Text('System default'),
-            subtitle: const Text('Follow device setting'),
-            value: ThemeMode.system,
-            groupValue: _themeMode,
-            onChanged: (v) => _setTheme(v!),
-          ),
-          RadioListTile<ThemeMode>(
-            title: const Text('Light mode'),
-            value: ThemeMode.light,
-            groupValue: _themeMode,
-            onChanged: (v) => _setTheme(v!),
-          ),
-          RadioListTile<ThemeMode>(
-            title: const Text('Dark mode'),
-            value: ThemeMode.dark,
-            groupValue: _themeMode,
-            onChanged: (v) => _setTheme(v!),
+          const SizedBox(height: 8),
+
+          // ── APPEARANCE ──────────────────────────────
+          _buildSectionLabel('Appearance'),
+          Card(
+            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            child: Column(
+              children: [
+                RadioListTile<ThemeMode>(
+                  title: const Text('System default'),
+                  subtitle: const Text('Follow device theme'),
+                  secondary: const Icon(Icons.brightness_auto_outlined),
+                  value: ThemeMode.system,
+                  groupValue: _themeMode,
+                  onChanged: (v) => _setTheme(v!),
+                  activeColor: AppTheme.primary,
+                ),
+                const Divider(height: 1, indent: 16),
+                RadioListTile<ThemeMode>(
+                  title: const Text('Light mode'),
+                  secondary: const Icon(Icons.light_mode_outlined),
+                  value: ThemeMode.light,
+                  groupValue: _themeMode,
+                  onChanged: (v) => _setTheme(v!),
+                  activeColor: AppTheme.primary,
+                ),
+                const Divider(height: 1, indent: 16),
+                RadioListTile<ThemeMode>(
+                  title: const Text('Dark mode'),
+                  secondary: const Icon(Icons.dark_mode_outlined),
+                  value: ThemeMode.dark,
+                  groupValue: _themeMode,
+                  onChanged: (v) => _setTheme(v!),
+                  activeColor: AppTheme.primary,
+                ),
+              ],
+            ),
           ),
 
-          const Divider(),
+          const SizedBox(height: 16),
 
-          // ── Notifications ───────────────────────────
-          const _SectionHeader('Notifications'),
-          SwitchListTile(
-            title: const Text('Deadline reminders'),
-            subtitle: const Text('Notify 1 day and 3 hours before deadline'),
-            value: _notifEnabled,
-            onChanged: _setNotifications,
-          ),
-          ListTile(
-            leading: const Icon(Icons.notifications_active_outlined),
-            title: const Text('Test notification'),
-            subtitle: const Text('Send a test notification now'),
-            onTap: () async {
-              await NotificationService.instance.showNow(
-                id: 999,
-                title: '🔔 Test Notification',
-                body: 'Notifications are working!',
-              );
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Test notification sent!')),
-                );
-              }
-            },
+          // ── NOTIFICATIONS ────────────────────────────
+          _buildSectionLabel('Notifications'),
+          Card(
+            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            child: SwitchListTile(
+              title: const Text('Deadline Reminders'),
+              subtitle: const Text(
+                'Get notified before assignment deadlines',
+              ),
+              secondary: const Icon(Icons.notifications_outlined),
+              value: _notificationsEnabled,
+              onChanged: _toggleNotifications,
+              activeColor: AppTheme.primary,
+            ),
           ),
 
-          const Divider(),
+          const SizedBox(height: 16),
 
-          // ── About ───────────────────────────────────
-          const _SectionHeader('About'),
-          const ListTile(
-            leading: Icon(Icons.info_outline),
-            title: Text('Student Planner'),
-            subtitle: Text('Version 1.0.0'),
+          // ── DATA ─────────────────────────────────────
+          _buildSectionLabel('Data'),
+          Card(
+            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            child: ListTile(
+              leading: _isExporting
+                  ? const SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.upload_outlined),
+              title: const Text('Export Data'),
+              subtitle: const Text(
+                'Copy all data as JSON to clipboard',
+              ),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: _isExporting ? null : _exportData,
+            ),
           ),
-          const ListTile(
-            leading: Icon(Icons.code),
-            title: Text('Built with Flutter'),
-            subtitle: Text('SQLite • Local Notifications'),
+
+          const SizedBox(height: 16),
+
+          // ── ABOUT ────────────────────────────────────
+          _buildSectionLabel('About'),
+          Card(
+            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            child: Column(
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.school_outlined),
+                  title: const Text('Student Planner'),
+                  subtitle: const Text('Version 2.0.0'),
+                ),
+                const Divider(height: 1, indent: 16),
+                ListTile(
+                  leading: const Icon(Icons.info_outline),
+                  title: const Text('Built with Flutter'),
+                  subtitle: const Text('Material Design 3'),
+                ),
+              ],
+            ),
           ),
+
+          const SizedBox(height: 32),
         ],
       ),
     );
   }
-}
 
-class _SectionHeader extends StatelessWidget {
-  final String text;
-  const _SectionHeader(this.text);
-
-  @override
-  Widget build(BuildContext context) {
+  Widget _buildSectionLabel(String label) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+      padding: const EdgeInsets.fromLTRB(20, 8, 16, 6),
       child: Text(
-        text.toUpperCase(),
+        label.toUpperCase(),
         style: TextStyle(
-          fontSize: 12,
+          fontSize: 11,
           fontWeight: FontWeight.bold,
-          color: Theme.of(context).colorScheme.primary,
-          letterSpacing: 1,
+          color: Colors.grey.shade500,
+          letterSpacing: 1.2,
         ),
       ),
     );
