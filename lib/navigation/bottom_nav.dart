@@ -4,7 +4,6 @@ import '../features/schedule/schedule_screen.dart';
 import '../features/assignment/assignment_screen.dart';
 import '../features/grade/grade_screen.dart';
 import '../features/note/note_screen.dart';
-import '../features/settings/settings_screen.dart';
 
 class BottomNav extends StatefulWidget {
   final void Function(ThemeMode) onThemeChanged;
