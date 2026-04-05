@@ -3,11 +3,12 @@ import '../features/dashboard/dashboard_screen.dart';
 import '../features/schedule/schedule_screen.dart';
 import '../features/assignment/assignment_screen.dart';
 import '../features/grade/grade_screen.dart';
-//import '../features/note/note_screen.dart';
-import '../features/subject/subject_screen.dart'; // TEMP
+import '../features/note/note_screen.dart';
+import '../features/settings/settings_screen.dart';
 
 class BottomNav extends StatefulWidget {
-  const BottomNav({super.key});
+  final void Function(ThemeMode) onThemeChanged;
+  const BottomNav({super.key, required this.onThemeChanged});
 
   @override
   State<BottomNav> createState() => _BottomNavState();
@@ -16,25 +17,24 @@ class BottomNav extends StatefulWidget {
 class _BottomNavState extends State<BottomNav> {
   int _currentIndex = 0;
 
-  // สร้างครั้งเดียว ไม่ rebuild เมื่อเปลี่ยน tab
-  final List<Widget> _screens = const [
-    DashboardScreen(),
-    ScheduleScreen(),
-    AssignmentScreen(),
-    GradeScreen(),
-    //NoteScreen(),
-    SubjectScreen(), // TEMP
-  ];
+  late final List<Widget> _screens;
+
+  @override
+  void initState() {
+    super.initState();
+    _screens = [
+      const DashboardScreen(),
+      const ScheduleScreen(),
+      const AssignmentScreen(),
+      const GradeScreen(),
+      const NoteScreen(),
+    ];
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: IndexedStack(
-        // IndexedStack แสดง screen ที่ active แต่ทุก screen ยังอยู่ใน memory
-        // ต่างจาก if/else ที่จะ rebuild ทุกครั้ง
-        index: _currentIndex,
-        children: _screens,
-      ),
+      body: IndexedStack(index: _currentIndex, children: _screens),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _currentIndex,
         onDestinationSelected: (i) => setState(() => _currentIndex = i),
@@ -59,17 +59,24 @@ class _BottomNavState extends State<BottomNav> {
             selectedIcon: Icon(Icons.grade),
             label: 'Grades',
           ),
-          // NavigationDestination(
-          //   icon: Icon(Icons.note_outlined),
-          //   selectedIcon: Icon(Icons.note),
-          //   label: 'Notes',
-          // ),
           NavigationDestination(
-            icon: Icon(Icons.menu_book_outlined),
-            selectedIcon: Icon(Icons.menu_book),
-            label: 'Subjects',
+            icon: Icon(Icons.note_outlined),
+            selectedIcon: Icon(Icons.note),
+            label: 'Notes',
           ),
         ],
+      ),
+      // Settings icon บน AppBar ไม่มีใน BottomNav
+      // เปิดผ่าน DashboardScreen แทน
+      floatingActionButton: FloatingActionButton.small(
+        onPressed: () => Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) =>
+                SettingsScreen(onThemeChanged: widget.onThemeChanged),
+          ),
+        ),
+        child: const Icon(Icons.settings),
       ),
     );
   }
