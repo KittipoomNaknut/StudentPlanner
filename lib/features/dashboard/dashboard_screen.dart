@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import '../../core/database/database_helper.dart';
 import '../../core/models/assignment.dart';
@@ -20,24 +21,34 @@ class DashboardScreen extends StatefulWidget {
   State<DashboardScreen> createState() => _DashboardScreenState();
 }
 
-class _DashboardScreenState extends State<DashboardScreen> {
-  List<Subject> _subjects = [];
-  List<Assignment> _pendingTasks = [];
-  List<Schedule> _todayClasses = [];
-  List<Schedule> _upcomingExams = [];
+class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProviderStateMixin {
+  List<Subject>    _subjects        = [];
+  List<Assignment> _pendingTasks    = [];
+  List<Schedule>   _todayClasses    = [];
+  List<Schedule>   _upcomingExams   = [];
   Map<int, double> _attendanceRates = {};
   bool _isLoading = true;
+
+  late AnimationController _fadeCtrl;
+  late Animation<double>   _fadeAnim;
 
   @override
   void initState() {
     super.initState();
+    _fadeCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 600));
+    _fadeAnim = CurvedAnimation(parent: _fadeCtrl, curve: Curves.easeOut);
     _loadData();
+  }
+
+  @override
+  void dispose() {
+    _fadeCtrl.dispose();
+    super.dispose();
   }
 
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
     final db = DatabaseHelper.instance;
-
     final results = await Future.wait([
       db.getSubjects(),
       db.getAssignments(status: 'pending'),
@@ -46,524 +57,359 @@ class _DashboardScreenState extends State<DashboardScreen> {
       db.getAttendance(),
     ]);
 
-    final subjects = results[0] as List<Subject>;
-    final pending = results[1] as List<Assignment>;
-    final classes = results[2] as List<Schedule>;
-    final exams = results[3] as List<Schedule>;
+    final subjects      = results[0] as List<Subject>;
+    final pending       = results[1] as List<Assignment>;
+    final classes       = results[2] as List<Schedule>;
+    final exams         = results[3] as List<Schedule>;
     final allAttendance = results[4] as List<Attendance>;
 
-    final todayIndex = DateTime.now().weekday - 1;
-    final todayClasses =
-        classes.where((s) => s.dayOfWeek == todayIndex).toList()
-          ..sort((a, b) => a.startTime.compareTo(b.startTime));
+    final todayIndex  = DateTime.now().weekday - 1;
+    final todayClasses = classes.where((s) => s.dayOfWeek == todayIndex).toList()
+      ..sort((a, b) => a.startTime.compareTo(b.startTime));
 
-    final now = DateTime.now();
+    final now      = DateTime.now();
     final nextWeek = now.add(const Duration(days: 7));
     final upcoming = exams.where((e) {
       final d = DateTime.tryParse(e.date ?? '');
       return d != null && d.isAfter(now) && d.isBefore(nextWeek);
     }).toList();
 
-    // Calculate attendance rate per subject
-    final attendanceRates = <int, double>{};
+    final rates = <int, double>{};
     for (final s in subjects) {
-      final records = allAttendance.where((a) => a.subjectId == s.id).toList();
-      if (records.isNotEmpty) {
-        final present = records.where((a) => a.isPresent || a.isLate).length;
-        attendanceRates[s.id!] = present / records.length;
+      final recs = allAttendance.where((a) => a.subjectId == s.id).toList();
+      if (recs.isNotEmpty) {
+        rates[s.id!] = recs.where((a) => a.isPresent || a.isLate).length / recs.length;
       }
     }
 
     setState(() {
-      _subjects = subjects;
-      _pendingTasks = pending;
-      _todayClasses = todayClasses;
-      _upcomingExams = upcoming;
-      _attendanceRates = attendanceRates;
-      _isLoading = false;
+      _subjects        = subjects;
+      _pendingTasks    = pending;
+      _todayClasses    = todayClasses;
+      _upcomingExams   = upcoming;
+      _attendanceRates = rates;
+      _isLoading       = false;
     });
+    _fadeCtrl
+      ..reset()
+      ..forward();
   }
 
   Subject? _getSubject(int id) {
-    try {
-      return _subjects.firstWhere((s) => s.id == id);
-    } catch (_) {
-      return null;
-    }
+    try { return _subjects.firstWhere((s) => s.id == id); }
+    catch (_) { return null; }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppTheme.background,
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(
               onRefresh: _loadData,
-              child: CustomScrollView(
-                slivers: [
-                  _buildSliverAppBar(),
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _buildStatRow(),
-                          const SizedBox(height: 16),
-                          _buildQuickActions(),
-                          const SizedBox(height: 24),
-                          if (_attendanceRates.isNotEmpty) ...[
-                            const SectionHeader(
-                              title: 'Attendance Warning',
-                              icon: Icons.warning_amber_outlined,
-                            ),
-                            _buildAttendanceWarnings(),
-                            const SizedBox(height: 24),
-                          ],
-                          if (_todayClasses.isNotEmpty) ...[
-                            SectionHeader(
-                              title: "Today's Classes",
-                              icon: Icons.class_outlined,
-                            ),
-                            ..._todayClasses.map(_buildClassCard),
-                            const SizedBox(height: 24),
-                          ],
-                          SectionHeader(
-                            title: 'Pending Tasks (${_pendingTasks.length})',
-                            icon: Icons.assignment_outlined,
-                          ),
-                          if (_pendingTasks.isEmpty)
-                            _buildEmptyBanner(
-                              'No pending tasks',
-                              Icons.check_circle_outline,
-                              AppTheme.success,
-                            )
-                          else
-                            ..._pendingTasks.take(5).map(_buildTaskCard),
-                          if (_pendingTasks.length > 5)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 8),
-                              child: Center(
-                                child: Text(
-                                  '+${_pendingTasks.length - 5} more tasks',
-                                  style: TextStyle(color: Colors.grey.shade500),
-                                ),
-                              ),
-                            ),
-                          if (_upcomingExams.isNotEmpty) ...[
-                            const SizedBox(height: 24),
-                            const SectionHeader(
-                              title: 'Upcoming Exams',
-                              icon: Icons.event_outlined,
-                            ),
-                            ..._upcomingExams.map(_buildExamCard),
-                          ],
-                          const SizedBox(height: 24),
-                        ],
+              color: AppTheme.primary,
+              child: FadeTransition(
+                opacity: _fadeAnim,
+                child: CustomScrollView(
+                  slivers: [
+                    _buildHeroHeader(),
+                    SliverToBoxAdapter(child: _buildBody()),
+                  ],
+                ),
+              ),
+            ),
+    );
+  }
+
+  // ── HERO HEADER ─────────────────────────────────────────
+  Widget _buildHeroHeader() {
+    final hour     = DateTime.now().hour;
+    final greeting = hour < 12 ? '☀️ Good morning!'
+                   : hour < 17 ? '🌤️ Good afternoon!'
+                   : '🌙 Good evening!';
+    final today    = DateFormat('EEEE, d MMMM').format(DateTime.now());
+    final overdue  = _pendingTasks.where((a) => a.isOverdue).length;
+
+    return SliverToBoxAdapter(
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          // Wave gradient background
+          ClipPath(
+            clipper: WaveClipper(),
+            child: Container(
+              height: 230,
+              decoration: const BoxDecoration(gradient: AppTheme.primaryGradient),
+              child: Stack(
+                children: [
+                  // Decorative circles
+                  Positioned(
+                    top: -30, right: -20,
+                    child: Container(
+                      width: 160, height: 160,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.white.withValues(alpha: 0.06),
                       ),
+                    ),
+                  ),
+                  Positioned(
+                    top: 30, right: 60,
+                    child: Container(
+                      width: 80, height: 80,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.white.withValues(alpha: 0.08),
+                      ),
+                    ),
+                  ),
+                  // Text content
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 56, 120, 0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          greeting,
+                          style: GoogleFonts.nunito(
+                            color: Colors.white.withValues(alpha: 0.9),
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          today,
+                          style: GoogleFonts.nunito(
+                            color: Colors.white,
+                            fontSize: 22,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        if (overdue > 0) ...[
+                          const SizedBox(height: 10),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.2),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.warning_amber_rounded, color: Colors.orangeAccent, size: 14),
+                                const SizedBox(width: 5),
+                                Text(
+                                  '$overdue overdue task${overdue > 1 ? 's' : ''}',
+                                  style: GoogleFonts.nunito(
+                                    color: Colors.white,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                   ),
                 ],
               ),
             ),
-    );
-  }
+          ),
 
-  Widget _buildSliverAppBar() {
-    final hour = DateTime.now().hour;
-    final greeting = hour < 12
-        ? 'Good morning'
-        : hour < 17
-        ? 'Good afternoon'
-        : 'Good evening';
-    final today = DateFormat('EEEE, d MMM yyyy').format(DateTime.now());
-    final overdue = _pendingTasks.where((a) => a.isOverdue).length;
-
-    return SliverAppBar(
-      expandedHeight: 160,
-      pinned: true,
-      actions: [
-        IconButton(
-          icon: const Icon(Icons.refresh, color: Colors.white),
-          onPressed: _loadData,
-        ),
-        IconButton(
-          icon: const Icon(Icons.settings_outlined, color: Colors.white),
-          onPressed: () async {
-            await Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) =>
+          // Action buttons top-right
+          Positioned(
+            top: 48, right: 8,
+            child: Row(
+              children: [
+                _iconBtn(Icons.refresh_rounded, _loadData),
+                _iconBtn(Icons.settings_outlined, () async {
+                  await Navigator.push(context, _slide(
                     SettingsScreen(onThemeChanged: widget.onThemeChanged),
-              ),
-            );
-            _loadData();
-          },
-        ),
-      ],
-      flexibleSpace: FlexibleSpaceBar(
-        background: Container(
-          decoration: const BoxDecoration(gradient: AppTheme.primaryGradient),
-          padding: const EdgeInsets.fromLTRB(20, 60, 20, 16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              Text(
-                greeting,
-                style: const TextStyle(color: Colors.white70, fontSize: 14),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                today,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              if (overdue > 0)
-                Container(
-                  margin: const EdgeInsets.only(top: 6),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: AppTheme.danger.withValues(alpha: 0.85),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    '$overdue overdue task${overdue > 1 ? 's' : ''}',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildStatRow() {
-    final overdue = _pendingTasks.where((a) => a.isOverdue).length;
-    return Row(
-      children: [
-        StatCard(
-          label: 'Subjects',
-          value: '${_subjects.length}',
-          icon: Icons.book_outlined,
-          color: AppTheme.primary,
-          onTap: () async {
-            await Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const SubjectScreen()),
-            );
-            _loadData();
-          },
-        ),
-        const SizedBox(width: 10),
-        StatCard(
-          label: 'Tasks',
-          value: '${_pendingTasks.length}',
-          icon: Icons.assignment_outlined,
-          color: AppTheme.warning,
-        ),
-        const SizedBox(width: 10),
-        StatCard(
-          label: 'Overdue',
-          value: '$overdue',
-          icon: Icons.warning_outlined,
-          color: overdue > 0 ? AppTheme.danger : Colors.grey,
-        ),
-      ],
-    );
-  }
-
-  Widget _buildQuickActions() {
-    return Row(
-      children: [
-        _buildActionChip(
-          icon: Icons.timer_outlined,
-          label: 'Pomodoro',
-          color: AppTheme.secondary,
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const PomodoroScreen()),
-          ),
-        ),
-        const SizedBox(width: 10),
-        _buildActionChip(
-          icon: Icons.fact_check_outlined,
-          label: 'Attendance',
-          color: AppTheme.teal,
-          onTap: () async {
-            await Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) =>
-                    AttendanceScreen(subjects: _subjects),
-              ),
-            );
-            _loadData();
-          },
-        ),
-        const SizedBox(width: 10),
-        _buildActionChip(
-          icon: Icons.menu_book_outlined,
-          label: 'Subjects',
-          color: AppTheme.primary,
-          onTap: () async {
-            await Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const SubjectScreen()),
-            );
-            _loadData();
-          },
-        ),
-      ],
-    );
-  }
-
-  Widget _buildActionChip({
-    required IconData icon,
-    required String label,
-    required Color color,
-    required VoidCallback onTap,
-  }) {
-    return Expanded(
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: color.withValues(alpha: 0.25)),
-          ),
-          child: Column(
-            children: [
-              Icon(icon, color: color, size: 22),
-              const SizedBox(height: 4),
-              Text(
-                label,
-                style: TextStyle(
-                  color: color,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildAttendanceWarnings() {
-    final lowAttendance = _subjects.where((s) {
-      final rate = _attendanceRates[s.id] ?? 1.0;
-      return rate < 0.75;
-    }).toList();
-
-    if (lowAttendance.isEmpty) {
-      return _buildEmptyBanner(
-        'All attendance above 75%',
-        Icons.check_circle_outline,
-        AppTheme.success,
-      );
-    }
-
-    return Column(
-      children: lowAttendance.map((s) {
-        final rate = _attendanceRates[s.id!] ?? 0.0;
-        final percent = (rate * 100).toStringAsFixed(0);
-        final color = AppTheme.fromHex(s.color);
-        return Card(
-          margin: const EdgeInsets.only(bottom: 8),
-          child: ListTile(
-            leading: CircleAvatar(
-              backgroundColor: AppTheme.danger.withValues(alpha: 0.1),
-              child: Icon(Icons.warning_amber, color: AppTheme.danger, size: 20),
-            ),
-            title: Text(
-              s.name,
-              style: const TextStyle(fontWeight: FontWeight.bold),
-            ),
-            subtitle: Text('Attendance: $percent% (below 75%)'),
-            trailing: Container(
-              width: 4,
-              height: 36,
-              decoration: BoxDecoration(
-                color: color,
-                borderRadius: BorderRadius.circular(2),
-              ),
+                  ));
+                  _loadData();
+                }),
+              ],
             ),
           ),
-        );
-      }).toList(),
-    );
-  }
 
-  Widget _buildEmptyBanner(String text, IconData icon, Color color) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withValues(alpha: 0.2)),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, color: color, size: 20),
-          const SizedBox(width: 10),
-          Text(
-            text,
-            style: TextStyle(color: color, fontWeight: FontWeight.w600),
+          // Floating stat cards overlapping the wave
+          Positioned(
+            bottom: -50,
+            left: 16, right: 16,
+            child: _buildStatCards(),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildClassCard(Schedule s) {
-    final subject = _getSubject(s.subjectId);
-    final color =
-        subject != null ? AppTheme.fromHex(subject.color) : Colors.grey;
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      child: ListTile(
-        leading: Container(
-          width: 4,
-          height: 40,
-          decoration: BoxDecoration(
-            color: color,
-            borderRadius: BorderRadius.circular(2),
-          ),
-        ),
-        title: Text(
-          subject?.name ?? 'Unknown',
-          style: const TextStyle(fontWeight: FontWeight.bold),
-        ),
-        subtitle: Text(
-          '${s.startTime} – ${s.endTime}'
-          '${s.room.isNotEmpty ? '  ·  ${s.room}' : ''}',
-        ),
-        trailing: CircleAvatar(
-          backgroundColor: color.withValues(alpha: 0.1),
-          child: Icon(Icons.class_, color: color, size: 18),
-        ),
+  Widget _iconBtn(IconData icon, VoidCallback onTap) {
+    return IconButton(
+      icon: Icon(icon, color: Colors.white, size: 22),
+      onPressed: onTap,
+      style: IconButton.styleFrom(
+        backgroundColor: Colors.white.withValues(alpha: 0.15),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        padding: const EdgeInsets.all(8),
       ),
     );
   }
 
-  Widget _buildTaskCard(Assignment a) {
-    final subject = _getSubject(a.subjectId);
-    final subjectColor =
-        subject != null ? AppTheme.fromHex(subject.color) : Colors.grey;
-    final deadlineDate = DateTime.tryParse(a.deadline);
-    final deadlineStr = deadlineDate != null
-        ? DateFormat('d MMM').format(deadlineDate)
-        : a.deadline;
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      child: ListTile(
-        leading: Container(
-          width: 4,
-          height: 40,
-          decoration: BoxDecoration(
-            color: AppTheme.priorityColor(a.priority),
-            borderRadius: BorderRadius.circular(2),
-          ),
+  Widget _buildStatCards() {
+    final overdue = _pendingTasks.where((a) => a.isOverdue).length;
+    return Row(
+      children: [
+        StatCard(
+          label: 'Subjects',
+          value: '${_subjects.length}',
+          icon: Icons.menu_book_rounded,
+          color: AppTheme.primary,
+          onTap: () async {
+            await Navigator.push(context, _slide(const SubjectScreen()));
+            _loadData();
+          },
         ),
-        title: Text(
-          a.title,
-          style: const TextStyle(fontWeight: FontWeight.bold),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
+        const SizedBox(width: 10),
+        StatCard(
+          label: 'Pending',
+          value: '${_pendingTasks.length}',
+          icon: Icons.assignment_rounded,
+          color: AppTheme.warning,
         ),
-        subtitle: Row(
-          children: [
-            SubjectDot(color: subjectColor, radius: 4),
-            const SizedBox(width: 5),
-            Text(subject?.name ?? '', style: const TextStyle(fontSize: 12)),
-            const SizedBox(width: 8),
-            Icon(
-              Icons.calendar_today,
-              size: 11,
-              color: a.isOverdue ? AppTheme.danger : Colors.grey,
-            ),
-            const SizedBox(width: 3),
-            Text(
-              deadlineStr,
-              style: TextStyle(
-                fontSize: 12,
-                color: a.isOverdue ? AppTheme.danger : Colors.grey,
-                fontWeight: a.isOverdue ? FontWeight.bold : FontWeight.normal,
-              ),
-            ),
+        const SizedBox(width: 10),
+        StatCard(
+          label: 'Overdue',
+          value: '$overdue',
+          icon: Icons.warning_rounded,
+          color: overdue > 0 ? AppTheme.danger : Colors.grey,
+        ),
+      ],
+    );
+  }
+
+  // ── BODY ─────────────────────────────────────────────────
+  Widget _buildBody() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 66, 16, 100),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildQuickActions(),
+          const SizedBox(height: 28),
+
+          // Attendance warnings
+          ..._buildAttendanceSection(),
+
+          // Today's Classes
+          if (_todayClasses.isNotEmpty) ...[
+            SectionHeader(title: "Today's Classes", icon: Icons.class_rounded, color: AppTheme.teal),
+            ..._todayClasses.map(_buildClassCard),
+            const SizedBox(height: 24),
           ],
-        ),
-        trailing: PriorityBadge(priority: a.priority),
-      ),
-    );
-  }
 
-  Widget _buildExamCard(Schedule s) {
-    final subject = _getSubject(s.subjectId);
-    final color =
-        subject != null ? AppTheme.fromHex(subject.color) : Colors.grey;
-    final examDate = DateTime.tryParse(s.date ?? '');
-    final daysLeft = examDate != null
-        ? examDate.difference(DateTime.now()).inDays
-        : 0;
-    final isUrgent = daysLeft <= 2;
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: color.withValues(alpha: 0.15),
-          child: Icon(Icons.event, color: color, size: 20),
-        ),
-        title: Text(
-          subject?.name ?? 'Unknown',
-          style: const TextStyle(fontWeight: FontWeight.bold),
-        ),
-        subtitle: Text(
-          '${s.date}  ·  ${s.startTime}'
-          '${s.room.isNotEmpty ? '  ·  ${s.room}' : ''}',
-        ),
-        trailing: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          decoration: BoxDecoration(
-            color: (isUrgent ? AppTheme.danger : AppTheme.warning).withValues(
-              alpha: 0.12,
-            ),
-            borderRadius: BorderRadius.circular(10),
+          // Pending Tasks
+          SectionHeader(
+            title: 'Pending Tasks (${_pendingTasks.length})',
+            icon: Icons.task_alt_rounded,
+            color: AppTheme.warning,
           ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                '$daysLeft',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: isUrgent ? AppTheme.danger : AppTheme.warning,
+          if (_pendingTasks.isEmpty)
+            _buildSuccessBanner('All tasks done! 🎉')
+          else
+            ..._pendingTasks.take(5).map(_buildTaskCard),
+          if (_pendingTasks.length > 5)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              child: Center(
+                child: Text(
+                  '+${_pendingTasks.length - 5} more tasks',
+                  style: GoogleFonts.nunito(color: Colors.grey.shade400, fontSize: 13),
                 ),
               ),
+            ),
+
+          // Upcoming Exams
+          if (_upcomingExams.isNotEmpty) ...[
+            const SizedBox(height: 24),
+            SectionHeader(title: 'Upcoming Exams', icon: Icons.event_rounded, color: AppTheme.danger),
+            ..._upcomingExams.map(_buildExamCard),
+          ],
+        ],
+      ),
+    );
+  }
+
+  // ── QUICK ACTIONS ────────────────────────────────────────
+  Widget _buildQuickActions() {
+    return Row(
+      children: [
+        _buildActionTile(
+          gradient: AppTheme.pinkGradient,
+          icon: Icons.timer_rounded,
+          label: 'Pomodoro',
+          onTap: () => Navigator.push(context, _slide(const PomodoroScreen())),
+        ),
+        const SizedBox(width: 10),
+        _buildActionTile(
+          gradient: AppTheme.tealGradient,
+          icon: Icons.fact_check_rounded,
+          label: 'Attendance',
+          onTap: () async {
+            await Navigator.push(context, _slide(AttendanceScreen(subjects: _subjects)));
+            _loadData();
+          },
+        ),
+        const SizedBox(width: 10),
+        _buildActionTile(
+          gradient: AppTheme.primaryGradient,
+          icon: Icons.menu_book_rounded,
+          label: 'Subjects',
+          onTap: () async {
+            await Navigator.push(context, _slide(const SubjectScreen()));
+            _loadData();
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildActionTile({
+    required LinearGradient gradient,
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          decoration: BoxDecoration(
+            gradient: gradient,
+            borderRadius: BorderRadius.circular(18),
+            boxShadow: [
+              BoxShadow(
+                color: gradient.colors.first.withValues(alpha: 0.3),
+                blurRadius: 14,
+                offset: const Offset(0, 5),
+              ),
+            ],
+          ),
+          child: Column(
+            children: [
+              Icon(icon, color: Colors.white, size: 24),
+              const SizedBox(height: 5),
               Text(
-                'days',
-                style: TextStyle(
-                  fontSize: 10,
-                  color: Colors.grey.shade500,
+                label,
+                style: GoogleFonts.nunito(
+                  color: Colors.white,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
             ],
@@ -572,4 +418,246 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ),
     );
   }
+
+  // ── ATTENDANCE SECTION ────────────────────────────────────
+  List<Widget> _buildAttendanceSection() {
+    final lowList = _subjects
+        .where((s) => (_attendanceRates[s.id] ?? 1.0) < 0.75 && (_attendanceRates[s.id] ?? -1) >= 0)
+        .toList();
+    if (lowList.isEmpty) return [];
+
+    return [
+      SectionHeader(title: 'Attendance Alert', icon: Icons.warning_amber_rounded, color: AppTheme.danger),
+      ...lowList.map((s) {
+        final rate = _attendanceRates[s.id!] ?? 0.0;
+        final pct  = (rate * 100).toStringAsFixed(0);
+        final color = AppTheme.fromHex(s.color);
+        return Container(
+          margin: const EdgeInsets.only(bottom: 8),
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: AppTheme.danger.withValues(alpha: 0.05),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppTheme.danger.withValues(alpha: 0.2)),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 4, height: 36,
+                decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(2)),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(s.name, style: GoogleFonts.nunito(fontWeight: FontWeight.w700)),
+                    Text('Attendance: $pct% — below 75%',
+                      style: GoogleFonts.nunito(color: AppTheme.danger, fontSize: 12, fontWeight: FontWeight.w600)),
+                  ],
+                ),
+              ),
+              Icon(Icons.warning_amber_rounded, color: AppTheme.danger, size: 20),
+            ],
+          ),
+        );
+      }),
+      const SizedBox(height: 24),
+    ];
+  }
+
+  Widget _buildSuccessBanner(String text) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [AppTheme.success.withValues(alpha: 0.08), AppTheme.teal.withValues(alpha: 0.04)],
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.success.withValues(alpha: 0.2)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.check_circle_rounded, color: AppTheme.success, size: 22),
+          const SizedBox(width: 10),
+          Text(text, style: GoogleFonts.nunito(color: AppTheme.success, fontWeight: FontWeight.w700)),
+        ],
+      ),
+    );
+  }
+
+  // ── CLASS CARD ───────────────────────────────────────────
+  Widget _buildClassCard(Schedule s) {
+    final subject = _getSubject(s.subjectId);
+    final color   = subject != null ? AppTheme.fromHex(subject.color) : AppTheme.primary;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: AppTheme.cardShadow,
+      ),
+      child: ListTile(
+        contentPadding: const EdgeInsets.fromLTRB(6, 4, 16, 4),
+        leading: Container(
+          width: 5, height: 44,
+          margin: const EdgeInsets.only(left: 10),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(colors: [color, color.withValues(alpha: 0.5)], begin: Alignment.topCenter, end: Alignment.bottomCenter),
+            borderRadius: BorderRadius.circular(3),
+          ),
+        ),
+        title: Text(subject?.name ?? 'Unknown', style: GoogleFonts.nunito(fontWeight: FontWeight.w700)),
+        subtitle: Text(
+          '${s.startTime} – ${s.endTime}${s.room.isNotEmpty ? '  ·  ${s.room}' : ''}',
+          style: GoogleFonts.nunito(fontSize: 12, color: Colors.grey.shade500),
+        ),
+        trailing: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(color: color.withValues(alpha: 0.1), shape: BoxShape.circle),
+          child: Icon(Icons.class_rounded, color: color, size: 18),
+        ),
+      ),
+    );
+  }
+
+  // ── TASK CARD ─────────────────────────────────────────────
+  Widget _buildTaskCard(Assignment a) {
+    final subject      = _getSubject(a.subjectId);
+    final subjectColor = subject != null ? AppTheme.fromHex(subject.color) : Colors.grey;
+    final pColor       = AppTheme.priorityColor(a.priority);
+    final deadlineDate = DateTime.tryParse(a.deadline);
+    final deadlineStr  = deadlineDate != null ? DateFormat('d MMM').format(deadlineDate) : a.deadline;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: AppTheme.cardShadow,
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Row(
+          children: [
+            // Priority dot
+            Container(
+              width: 5, height: 46,
+              decoration: BoxDecoration(
+                gradient: AppTheme.priorityGradient(a.priority),
+                borderRadius: BorderRadius.circular(3),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(a.title,
+                    style: GoogleFonts.nunito(fontWeight: FontWeight.w700, fontSize: 14),
+                    maxLines: 1, overflow: TextOverflow.ellipsis),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      SubjectDot(color: subjectColor, radius: 4),
+                      const SizedBox(width: 5),
+                      Expanded(
+                        child: Text(subject?.name ?? '',
+                          style: GoogleFonts.nunito(fontSize: 12, color: subjectColor, fontWeight: FontWeight.w600),
+                          maxLines: 1, overflow: TextOverflow.ellipsis),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 10),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                PriorityBadge(priority: a.priority),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Icon(Icons.calendar_today_rounded, size: 10,
+                      color: a.isOverdue ? AppTheme.danger : Colors.grey.shade400),
+                    const SizedBox(width: 3),
+                    Text(deadlineStr,
+                      style: GoogleFonts.nunito(
+                        fontSize: 11,
+                        color: a.isOverdue ? AppTheme.danger : Colors.grey.shade400,
+                        fontWeight: a.isOverdue ? FontWeight.w700 : FontWeight.w500,
+                      )),
+                  ],
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── EXAM CARD ─────────────────────────────────────────────
+  Widget _buildExamCard(Schedule s) {
+    final subject  = _getSubject(s.subjectId);
+    final color    = subject != null ? AppTheme.fromHex(subject.color) : AppTheme.danger;
+    final examDate = DateTime.tryParse(s.date ?? '');
+    final daysLeft = examDate != null ? examDate.difference(DateTime.now()).inDays : 0;
+    final isUrgent = daysLeft <= 2;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: AppTheme.cardShadow,
+      ),
+      child: ListTile(
+        leading: Container(
+          width: 46, height: 46,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(colors: [color, color.withValues(alpha: 0.6)],
+              begin: Alignment.topLeft, end: Alignment.bottomRight),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: const Icon(Icons.event_rounded, color: Colors.white, size: 22),
+        ),
+        title: Text(subject?.name ?? 'Unknown', style: GoogleFonts.nunito(fontWeight: FontWeight.w700)),
+        subtitle: Text(
+          '${s.date}  ·  ${s.startTime}${s.room.isNotEmpty ? '  ·  ${s.room}' : ''}',
+          style: GoogleFonts.nunito(fontSize: 12, color: Colors.grey.shade500),
+        ),
+        trailing: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: (isUrgent ? AppTheme.danger : AppTheme.warning).withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('$daysLeft',
+                style: GoogleFonts.nunito(
+                  fontSize: 18, fontWeight: FontWeight.w800,
+                  color: isUrgent ? AppTheme.danger : AppTheme.warning,
+                )),
+              Text('days', style: GoogleFonts.nunito(fontSize: 10, color: Colors.grey.shade400)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  PageRouteBuilder _slide(Widget page) => PageRouteBuilder(
+    pageBuilder: (_, a1, a2) => page,
+    transitionsBuilder: (_, a1, a2, child) =>
+      SlideTransition(
+        position: Tween<Offset>(begin: const Offset(1, 0), end: Offset.zero)
+          .animate(CurvedAnimation(parent: a1, curve: Curves.easeOutCubic)),
+        child: child,
+      ),
+  );
 }
