@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import '../../core/database/database_helper.dart';
 import '../../core/models/note.dart';
@@ -10,73 +11,58 @@ import 'note_detail_screen.dart';
 
 class NoteScreen extends StatefulWidget {
   const NoteScreen({super.key});
-
   @override
   State<NoteScreen> createState() => _NoteScreenState();
 }
 
 class _NoteScreenState extends State<NoteScreen> {
-  List<Note> _notes = [];
+  List<Note>    _notes    = [];
   List<Subject> _subjects = [];
   bool _isLoading = true;
   String _searchQuery = '';
-  Timer? _debounce;
   int? _filterSubjectId;
+  Timer? _debounce;
   final _searchCtrl = TextEditingController();
 
   @override
-  void initState() {
-    super.initState();
-    _loadData();
-  }
+  void initState() { super.initState(); _loadData(); }
 
   @override
-  void dispose() {
-    _debounce?.cancel();
-    _searchCtrl.dispose();
-    super.dispose();
-  }
+  void dispose() { _debounce?.cancel(); _searchCtrl.dispose(); super.dispose(); }
 
   Future<void> _loadData({String? search}) async {
     setState(() => _isLoading = true);
     final results = await Future.wait([
       DatabaseHelper.instance.getNotes(
         subjectId: _filterSubjectId,
-        search: search?.isEmpty == true ? null : search,
+        search: (search?.isEmpty ?? true) ? null : search,
       ),
       DatabaseHelper.instance.getSubjects(),
     ]);
     setState(() {
-      _notes = results[0] as List<Note>;
+      _notes    = results[0] as List<Note>;
       _subjects = results[1] as List<Subject>;
       _isLoading = false;
     });
   }
 
-  void _onSearchChanged(String query) {
+  void _onSearch(String q) {
     _debounce?.cancel();
     _debounce = Timer(const Duration(milliseconds: 400), () {
-      setState(() => _searchQuery = query);
-      _loadData(search: query);
+      setState(() => _searchQuery = q);
+      _loadData(search: q);
     });
   }
 
-  Subject? _getSubject(int subjectId) {
-    try {
-      return _subjects.firstWhere((s) => s.id == subjectId);
-    } catch (_) {
-      return null;
-    }
+  Subject? _getSubject(int id) {
+    try { return _subjects.firstWhere((s) => s.id == id); }
+    catch (_) { return null; }
   }
 
-  Future<void> _deleteNote(Note note) async {
-    final confirmed = await showConfirmDelete(
-      context,
-      title: 'Delete Note',
-      content: 'Delete "${note.title}"?',
-    );
-    if (confirmed) {
-      await DatabaseHelper.instance.deleteNote(note.id!);
+  Future<void> _deleteNote(Note n) async {
+    final ok = await showConfirmDelete(context, title: 'Delete Note', content: 'Delete "${n.title}"?');
+    if (ok) {
+      await DatabaseHelper.instance.deleteNote(n.id!);
       _loadData(search: _searchQuery.isEmpty ? null : _searchQuery);
     }
   }
@@ -84,72 +70,51 @@ class _NoteScreenState extends State<NoteScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppTheme.background,
       appBar: AppBar(
         title: const Text('Notes'),
         actions: [
-          if (_filterSubjectId != null)
-            IconButton(
-              icon: const Icon(Icons.filter_list_off),
-              tooltip: 'Clear filter',
-              onPressed: () {
-                setState(() => _filterSubjectId = null);
-                _loadData(search: _searchQuery.isEmpty ? null : _searchQuery);
-              },
-            ),
           PopupMenuButton<int?>(
-            icon: const Icon(Icons.filter_list),
+            icon: Icon(Icons.filter_list_rounded,
+              color: _filterSubjectId != null ? Colors.orange : Colors.white),
             tooltip: 'Filter by subject',
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
             onSelected: (id) {
               setState(() => _filterSubjectId = id);
               _loadData(search: _searchQuery.isEmpty ? null : _searchQuery);
             },
             itemBuilder: (_) => [
-              const PopupMenuItem(value: null, child: Text('All Subjects')),
-              ..._subjects.map(
-                (s) => PopupMenuItem(
-                  value: s.id,
-                  child: Row(
-                    children: [
-                      CircleAvatar(
-                        backgroundColor: AppTheme.fromHex(s.color),
-                        radius: 6,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(s.name),
-                    ],
-                  ),
-                ),
-              ),
+              PopupMenuItem(value: null,
+                child: Text('All Subjects', style: GoogleFonts.nunito(fontWeight: FontWeight.w600))),
+              ..._subjects.map((s) => PopupMenuItem(value: s.id,
+                child: Row(children: [
+                  CircleAvatar(backgroundColor: AppTheme.fromHex(s.color), radius: 6),
+                  const SizedBox(width: 8),
+                  Text(s.name, style: GoogleFonts.nunito(fontWeight: FontWeight.w600)),
+                ]))),
             ],
           ),
         ],
         bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(60),
+          preferredSize: const Size.fromHeight(56),
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
             child: TextField(
               controller: _searchCtrl,
-              onChanged: _onSearchChanged,
+              onChanged: _onSearch,
               style: const TextStyle(color: Colors.white),
               decoration: InputDecoration(
                 hintText: 'Search notes…',
                 hintStyle: const TextStyle(color: Colors.white54),
-                prefixIcon: const Icon(Icons.search, color: Colors.white54),
+                prefixIcon: const Icon(Icons.search_rounded, color: Colors.white54),
                 suffixIcon: _searchCtrl.text.isNotEmpty
                     ? IconButton(
-                        icon: const Icon(Icons.clear, color: Colors.white54),
-                        onPressed: () {
-                          _searchCtrl.clear();
-                          _onSearchChanged('');
-                        },
-                      )
+                        icon: const Icon(Icons.clear_rounded, color: Colors.white54),
+                        onPressed: () { _searchCtrl.clear(); _onSearch(''); })
                     : null,
                 filled: true,
-                fillColor: Colors.white.withValues(alpha: 0.15),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: BorderSide.none,
-                ),
+                fillColor: Colors.white.withValues(alpha: 0.18),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
                 contentPadding: const EdgeInsets.symmetric(vertical: 10),
               ),
             ),
@@ -160,21 +125,16 @@ class _NoteScreenState extends State<NoteScreen> {
           ? const Center(child: CircularProgressIndicator())
           : _notes.isEmpty
           ? EmptyState(
-              icon: Icons.note_outlined,
+              icon: Icons.sticky_note_2_rounded,
               title: _searchQuery.isNotEmpty ? 'No notes found' : 'No notes yet',
-              subtitle: _searchQuery.isNotEmpty
-                  ? 'Try a different search'
-                  : 'Tap + to create a note',
+              subtitle: _searchQuery.isNotEmpty ? 'Try a different search' : 'Tap + to create a note',
             )
-          : _buildNoteGrid(),
+          : _buildGrid(),
       floatingActionButton: FloatingActionButton(
         onPressed: () async {
-          await Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => NoteDetailScreen(subjects: _subjects),
-            ),
-          );
+          await Navigator.push(context, MaterialPageRoute(
+            builder: (_) => NoteDetailScreen(subjects: _subjects),
+          ));
           _loadData(search: _searchQuery.isEmpty ? null : _searchQuery);
         },
         child: const Icon(Icons.add),
@@ -182,37 +142,28 @@ class _NoteScreenState extends State<NoteScreen> {
     );
   }
 
-  Widget _buildNoteGrid() {
+  Widget _buildGrid() {
     return RefreshIndicator(
       onRefresh: () => _loadData(search: _searchQuery.isEmpty ? null : _searchQuery),
+      color: AppTheme.primary,
       child: GridView.builder(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2,
-          crossAxisSpacing: 12,
-          mainAxisSpacing: 12,
-          childAspectRatio: 0.85,
+          crossAxisCount: 2, crossAxisSpacing: 12, mainAxisSpacing: 12, childAspectRatio: 0.82,
         ),
         itemCount: _notes.length,
-        itemBuilder: (context, index) {
-          final note = _notes[index];
-          final subject = _getSubject(note.subjectId);
+        itemBuilder: (_, i) {
+          final n       = _notes[i];
+          final subject = _getSubject(n.subjectId);
           return _NoteCard(
-            note: note,
-            subject: subject,
+            note: n, subject: subject,
             onTap: () async {
-              await Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => NoteDetailScreen(
-                    subjects: _subjects,
-                    note: note,
-                  ),
-                ),
-              );
+              await Navigator.push(context, MaterialPageRoute(
+                builder: (_) => NoteDetailScreen(subjects: _subjects, note: n),
+              ));
               _loadData(search: _searchQuery.isEmpty ? null : _searchQuery);
             },
-            onDelete: () => _deleteNote(note),
+            onDelete: () => _deleteNote(n),
           );
         },
       ),
@@ -220,70 +171,60 @@ class _NoteScreenState extends State<NoteScreen> {
   }
 }
 
+// ── NOTE CARD ─────────────────────────────────────────────────
 class _NoteCard extends StatelessWidget {
-  final Note note;
-  final Subject? subject;
-  final VoidCallback onTap;
-  final VoidCallback onDelete;
+  final Note note; final Subject? subject;
+  final VoidCallback onTap, onDelete;
 
-  const _NoteCard({
-    required this.note,
-    required this.subject,
-    required this.onTap,
-    required this.onDelete,
-  });
+  const _NoteCard({required this.note, required this.subject, required this.onTap, required this.onDelete});
 
   @override
   Widget build(BuildContext context) {
-    final color = subject != null
-        ? AppTheme.fromHex(subject!.color)
-        : Colors.blueGrey;
-    final updatedDate = DateTime.tryParse(note.updatedAt);
-    final dateStr = updatedDate != null
-        ? DateFormat('d MMM').format(updatedDate)
-        : '';
+    final color   = subject != null ? AppTheme.fromHex(subject!.color) : AppTheme.primary;
+    final bgColor = Color.lerp(color.withValues(alpha: 0.08), Colors.white, 0.5)!;
+    final updated = DateTime.tryParse(note.updatedAt);
+    final dateStr = updated != null ? DateFormat('d MMM').format(updated) : '';
 
-    return Material(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(16),
-      clipBehavior: Clip.antiAlias,
-      elevation: 0,
-      child: InkWell(
-        onTap: onTap,
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(color: color.withValues(alpha: 0.12), blurRadius: 16, offset: const Offset(0, 4)),
+          ],
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Color header bar
+            // Gradient top bar
             Container(
-              height: 6,
-              color: color,
+              height: 8,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(colors: [color, color.withValues(alpha: 0.6)]),
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+              ),
             ),
             Expanded(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(12, 10, 8, 8),
+                padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Expanded(
                           child: Text(
                             note.title,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 14,
-                            ),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.nunito(fontWeight: FontWeight.w800, fontSize: 14),
+                            maxLines: 2, overflow: TextOverflow.ellipsis,
                           ),
                         ),
                         GestureDetector(
                           onTap: onDelete,
-                          child: Icon(
-                            Icons.more_vert,
-                            size: 18,
-                            color: Colors.grey.shade400,
-                          ),
+                          child: Icon(Icons.close_rounded, size: 16, color: Colors.grey.shade300),
                         ),
                       ],
                     ),
@@ -291,39 +232,27 @@ class _NoteCard extends StatelessWidget {
                     Expanded(
                       child: Text(
                         note.content,
-                        style: TextStyle(
-                          color: Colors.grey.shade500,
-                          fontSize: 12,
-                          height: 1.4,
-                        ),
-                        maxLines: 4,
-                        overflow: TextOverflow.fade,
+                        style: GoogleFonts.nunito(color: Colors.grey.shade500, fontSize: 12, height: 1.5),
+                        maxLines: 4, overflow: TextOverflow.fade,
                       ),
                     ),
                     const SizedBox(height: 8),
                     Row(
                       children: [
-                        SubjectDot(color: color, radius: 4),
-                        const SizedBox(width: 5),
-                        Expanded(
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: color.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
                           child: Text(
                             subject?.name ?? 'Unknown',
-                            style: TextStyle(
-                              color: color,
-                              fontSize: 10,
-                              fontWeight: FontWeight.w600,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.nunito(color: color, fontSize: 10, fontWeight: FontWeight.w700),
+                            maxLines: 1, overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                        Text(
-                          dateStr,
-                          style: TextStyle(
-                            color: Colors.grey.shade400,
-                            fontSize: 10,
-                          ),
-                        ),
+                        const Spacer(),
+                        Text(dateStr, style: GoogleFonts.nunito(color: Colors.grey.shade300, fontSize: 10)),
                       ],
                     ),
                   ],
