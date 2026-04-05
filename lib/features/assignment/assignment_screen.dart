@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import '../../core/database/database_helper.dart';
 import '../../core/models/assignment.dart';
@@ -9,21 +10,37 @@ import 'add_assignment_screen.dart';
 
 class AssignmentScreen extends StatefulWidget {
   const AssignmentScreen({super.key});
-
   @override
   State<AssignmentScreen> createState() => _AssignmentScreenState();
 }
 
-class _AssignmentScreenState extends State<AssignmentScreen> {
+class _AssignmentScreenState extends State<AssignmentScreen>
+    with SingleTickerProviderStateMixin {
   List<Assignment> _assignments = [];
-  List<Subject> _subjects = [];
-  bool _isLoading = true;
+  List<Subject>    _subjects    = [];
+  bool _isLoading   = true;
   String? _filterStatus;
+  late TabController _tabCtrl;
 
   @override
   void initState() {
     super.initState();
+    _tabCtrl = TabController(length: 3, vsync: this);
+    _tabCtrl.addListener(() {
+      if (!_tabCtrl.indexIsChanging) {
+        setState(() {
+          _filterStatus = [null, 'pending', 'done'][_tabCtrl.index];
+        });
+        _loadData();
+      }
+    });
     _loadData();
+  }
+
+  @override
+  void dispose() {
+    _tabCtrl.dispose();
+    super.dispose();
   }
 
   Future<void> _loadData() async {
@@ -34,32 +51,26 @@ class _AssignmentScreenState extends State<AssignmentScreen> {
     ]);
     setState(() {
       _assignments = results[0] as List<Assignment>;
-      _subjects = results[1] as List<Subject>;
-      _isLoading = false;
+      _subjects    = results[1] as List<Subject>;
+      _isLoading   = false;
     });
   }
 
-  Subject? _getSubject(int subjectId) {
-    try {
-      return _subjects.firstWhere((s) => s.id == subjectId);
-    } catch (_) {
-      return null;
-    }
+  Subject? _getSubject(int id) {
+    try { return _subjects.firstWhere((s) => s.id == id); }
+    catch (_) { return null; }
   }
 
   Future<void> _toggleStatus(Assignment a) async {
-    final updated = a.copyWith(status: a.isDone ? 'pending' : 'done');
-    await DatabaseHelper.instance.updateAssignment(updated);
+    await DatabaseHelper.instance.updateAssignment(
+      a.copyWith(status: a.isDone ? 'pending' : 'done'),
+    );
     _loadData();
   }
 
   Future<void> _delete(Assignment a) async {
-    final confirmed = await showConfirmDelete(
-      context,
-      title: 'Delete Task',
-      content: 'Delete "${a.title}"?',
-    );
-    if (confirmed) {
+    final ok = await showConfirmDelete(context, title: 'Delete Task', content: 'Delete "${a.title}"?');
+    if (ok) {
       await DatabaseHelper.instance.deleteAssignment(a.id!);
       _loadData();
     }
@@ -68,94 +79,36 @@ class _AssignmentScreenState extends State<AssignmentScreen> {
   @override
   Widget build(BuildContext context) {
     final overdue = _assignments.where((a) => a.isOverdue).length;
-
     return Scaffold(
+      backgroundColor: AppTheme.background,
       appBar: AppBar(
         title: const Text('Tasks'),
-        actions: [
-          PopupMenuButton<String?>(
-            icon: Icon(
-              Icons.filter_list,
-              color: _filterStatus != null ? Colors.orange : Colors.white,
-            ),
-            tooltip: 'Filter',
-            onSelected: (val) {
-              setState(() => _filterStatus = val);
-              _loadData();
-            },
-            itemBuilder: (_) => [
-              PopupMenuItem(
-                value: null,
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.all_inclusive,
-                      size: 18,
-                      color: _filterStatus == null ? AppTheme.primary : null,
-                    ),
-                    const SizedBox(width: 8),
-                    const Text('All'),
-                  ],
-                ),
-              ),
-              PopupMenuItem(
-                value: 'pending',
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.radio_button_unchecked,
-                      size: 18,
-                      color: _filterStatus == 'pending' ? AppTheme.primary : null,
-                    ),
-                    const SizedBox(width: 8),
-                    const Text('Pending'),
-                  ],
-                ),
-              ),
-              PopupMenuItem(
-                value: 'done',
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.check_circle,
-                      size: 18,
-                      color: _filterStatus == 'done' ? AppTheme.primary : null,
-                    ),
-                    const SizedBox(width: 8),
-                    const Text('Done'),
-                  ],
-                ),
-              ),
-            ],
+        bottom: TabBar(
+          controller: _tabCtrl,
+          tabs: const [Tab(text: 'All'), Tab(text: 'Pending'), Tab(text: 'Done')],
+        ),
+      ),
+      body: Column(
+        children: [
+          if (overdue > 0) _buildOverdueBanner(overdue),
+          Expanded(
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _assignments.isEmpty
+                ? EmptyState(
+                    icon: Icons.task_alt_rounded,
+                    title: _filterStatus == null ? 'No tasks yet' : 'No ${_filterStatus} tasks',
+                    subtitle: 'Tap + to add a task',
+                  )
+                : _buildList(),
           ),
         ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : Column(
-              children: [
-                if (overdue > 0) _buildOverdueBanner(overdue),
-                Expanded(
-                  child: _assignments.isEmpty
-                      ? EmptyState(
-                          icon: Icons.assignment_outlined,
-                          title: _filterStatus == null
-                              ? 'No tasks yet'
-                              : 'No ${_filterStatus} tasks',
-                          subtitle: 'Tap + to add a task',
-                        )
-                      : _buildList(),
-                ),
-              ],
-            ),
       floatingActionButton: FloatingActionButton(
         onPressed: () async {
-          await Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => AddAssignmentScreen(subjects: _subjects),
-            ),
-          );
+          await Navigator.push(context, MaterialPageRoute(
+            builder: (_) => AddAssignmentScreen(subjects: _subjects),
+          ));
           _loadData();
         },
         child: const Icon(Icons.add),
@@ -166,18 +119,22 @@ class _AssignmentScreenState extends State<AssignmentScreen> {
   Widget _buildOverdueBanner(int count) {
     return Container(
       width: double.infinity,
+      margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      color: AppTheme.danger.withValues(alpha: 0.1),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [AppTheme.danger.withValues(alpha: 0.12), AppTheme.orange.withValues(alpha: 0.06)],
+        ),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppTheme.danger.withValues(alpha: 0.25)),
+      ),
       child: Row(
         children: [
-          const Icon(Icons.warning_amber, color: AppTheme.danger, size: 18),
+          const Icon(Icons.warning_rounded, color: AppTheme.danger, size: 18),
           const SizedBox(width: 8),
           Text(
-            '$count overdue task${count > 1 ? 's' : ''}',
-            style: const TextStyle(
-              color: AppTheme.danger,
-              fontWeight: FontWeight.bold,
-            ),
+            '$count overdue task${count > 1 ? 's' : ''} — act now!',
+            style: GoogleFonts.nunito(color: AppTheme.danger, fontWeight: FontWeight.w700),
           ),
         ],
       ),
@@ -187,24 +144,21 @@ class _AssignmentScreenState extends State<AssignmentScreen> {
   Widget _buildList() {
     return RefreshIndicator(
       onRefresh: _loadData,
+      color: AppTheme.primary,
       child: ListView.builder(
-        padding: const EdgeInsets.only(bottom: 80),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
         itemCount: _assignments.length,
-        itemBuilder: (context, index) {
-          final a = _assignments[index];
+        itemBuilder: (_, i) {
+          final a       = _assignments[i];
           final subject = _getSubject(a.subjectId);
           return _AssignmentCard(
             assignment: a,
             subject: subject,
             onToggle: () => _toggleStatus(a),
             onEdit: () async {
-              await Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) =>
-                      AddAssignmentScreen(subjects: _subjects, assignment: a),
-                ),
-              );
+              await Navigator.push(context, MaterialPageRoute(
+                builder: (_) => AddAssignmentScreen(subjects: _subjects, assignment: a),
+              ));
               _loadData();
             },
             onDelete: () => _delete(a),
@@ -215,140 +169,140 @@ class _AssignmentScreenState extends State<AssignmentScreen> {
   }
 }
 
-// ── ASSIGNMENT CARD ──────────────────────────────────────────
+// ── CARD ──────────────────────────────────────────────────────
 class _AssignmentCard extends StatelessWidget {
   final Assignment assignment;
-  final Subject? subject;
-  final VoidCallback onToggle;
-  final VoidCallback onEdit;
-  final VoidCallback onDelete;
+  final Subject?   subject;
+  final VoidCallback onToggle, onEdit, onDelete;
 
   const _AssignmentCard({
-    required this.assignment,
-    required this.subject,
-    required this.onToggle,
-    required this.onEdit,
-    required this.onDelete,
+    required this.assignment, required this.subject,
+    required this.onToggle, required this.onEdit, required this.onDelete,
   });
 
   @override
   Widget build(BuildContext context) {
-    final subjectColor = subject != null
-        ? AppTheme.fromHex(subject!.color)
-        : Colors.grey;
+    final subjectColor = subject != null ? AppTheme.fromHex(subject!.color) : Colors.grey;
+    final pColor       = AppTheme.priorityColor(assignment.priority);
     final deadlineDate = DateTime.tryParse(assignment.deadline);
-    final deadlineStr = deadlineDate != null
+    final deadlineStr  = deadlineDate != null
         ? DateFormat('d MMM yyyy').format(deadlineDate)
         : assignment.deadline;
-    final priorityColor = AppTheme.priorityColor(assignment.priority);
 
-    return Card(
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: AppTheme.cardShadow,
+      ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4),
-        child: ListTile(
-          leading: GestureDetector(
-            onTap: onToggle,
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 200),
-              child: CircleAvatar(
-                key: ValueKey(assignment.isDone),
-                backgroundColor: assignment.isDone
-                    ? AppTheme.success.withValues(alpha: 0.15)
-                    : priorityColor.withValues(alpha: 0.12),
-                child: Icon(
-                  assignment.isDone
-                      ? Icons.check_circle
-                      : Icons.radio_button_unchecked,
-                  color: assignment.isDone ? AppTheme.success : priorityColor,
-                  size: 22,
-                ),
+        padding: const EdgeInsets.fromLTRB(6, 10, 8, 10),
+        child: Row(
+          children: [
+            // Priority stripe
+            Container(
+              width: 5, height: 56,
+              margin: const EdgeInsets.only(left: 8, right: 12),
+              decoration: BoxDecoration(
+                gradient: AppTheme.priorityGradient(assignment.priority),
+                borderRadius: BorderRadius.circular(3),
               ),
             ),
-          ),
-          title: Text(
-            assignment.title,
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              decoration: assignment.isDone ? TextDecoration.lineThrough : null,
-              color: assignment.isDone ? Colors.grey : null,
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          subtitle: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (subject != null)
-                Row(
-                  children: [
-                    SubjectDot(color: subjectColor, radius: 4),
-                    const SizedBox(width: 5),
-                    Text(
-                      subject!.name,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: subjectColor,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
+            // Checkbox
+            GestureDetector(
+              onTap: onToggle,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                width: 28, height: 28,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: assignment.isDone ? AppTheme.success : Colors.transparent,
+                  border: Border.all(
+                    color: assignment.isDone ? AppTheme.success : Colors.grey.shade300,
+                    width: 2,
+                  ),
                 ),
-              const SizedBox(height: 4),
-              Row(
+                child: assignment.isDone
+                    ? const Icon(Icons.check_rounded, color: Colors.white, size: 16)
+                    : null,
+              ),
+            ),
+            const SizedBox(width: 12),
+            // Content
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(
-                    Icons.calendar_today,
-                    size: 11,
-                    color: assignment.isOverdue ? AppTheme.danger : Colors.grey,
-                  ),
-                  const SizedBox(width: 4),
                   Text(
-                    assignment.isOverdue
-                        ? 'Overdue · $deadlineStr'
-                        : deadlineStr,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: assignment.isOverdue ? AppTheme.danger : Colors.grey,
-                      fontWeight: assignment.isOverdue
-                          ? FontWeight.bold
-                          : FontWeight.normal,
+                    assignment.title,
+                    style: GoogleFonts.nunito(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14,
+                      decoration: assignment.isDone ? TextDecoration.lineThrough : null,
+                      color: assignment.isDone ? Colors.grey.shade400 : null,
                     ),
+                    maxLines: 1, overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(width: 8),
-                  PriorityBadge(priority: assignment.priority),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      SubjectDot(color: subjectColor, radius: 4),
+                      const SizedBox(width: 5),
+                      Expanded(
+                        child: Text(
+                          subject?.name ?? '',
+                          style: GoogleFonts.nunito(fontSize: 12, color: subjectColor, fontWeight: FontWeight.w600),
+                          maxLines: 1, overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Icon(Icons.calendar_today_rounded, size: 11,
+                        color: assignment.isOverdue ? AppTheme.danger : Colors.grey.shade400),
+                      const SizedBox(width: 4),
+                      Text(
+                        assignment.isOverdue ? 'Overdue · $deadlineStr' : deadlineStr,
+                        style: GoogleFonts.nunito(
+                          fontSize: 11,
+                          color: assignment.isOverdue ? AppTheme.danger : Colors.grey.shade400,
+                          fontWeight: assignment.isOverdue ? FontWeight.w700 : FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
                 ],
               ),
-            ],
-          ),
-          trailing: PopupMenuButton<String>(
-            onSelected: (val) {
-              if (val == 'edit') onEdit();
-              if (val == 'delete') onDelete();
-            },
-            itemBuilder: (_) => [
-              const PopupMenuItem(
-                value: 'edit',
-                child: Row(
-                  children: [
-                    Icon(Icons.edit_outlined, size: 18),
-                    SizedBox(width: 8),
-                    Text('Edit'),
+            ),
+            Column(
+              children: [
+                PriorityBadge(priority: assignment.priority),
+                const SizedBox(height: 6),
+                PopupMenuButton<String>(
+                  icon: Icon(Icons.more_vert, color: Colors.grey.shade400, size: 18),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  onSelected: (v) { if (v == 'edit') onEdit(); if (v == 'delete') onDelete(); },
+                  itemBuilder: (_) => [
+                    PopupMenuItem(value: 'edit',
+                      child: Row(children: [
+                        Icon(Icons.edit_outlined, size: 16, color: AppTheme.primary),
+                        const SizedBox(width: 8),
+                        Text('Edit', style: GoogleFonts.nunito(fontWeight: FontWeight.w600)),
+                      ])),
+                    PopupMenuItem(value: 'delete',
+                      child: Row(children: [
+                        Icon(Icons.delete_outline, size: 16, color: AppTheme.danger),
+                        const SizedBox(width: 8),
+                        Text('Delete', style: GoogleFonts.nunito(color: AppTheme.danger, fontWeight: FontWeight.w600)),
+                      ])),
                   ],
                 ),
-              ),
-              const PopupMenuItem(
-                value: 'delete',
-                child: Row(
-                  children: [
-                    Icon(Icons.delete_outline, size: 18, color: Colors.red),
-                    SizedBox(width: 8),
-                    Text('Delete', style: TextStyle(color: Colors.red)),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          isThreeLine: true,
+              ],
+            ),
+          ],
         ),
       ),
     );
