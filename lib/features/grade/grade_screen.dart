@@ -75,6 +75,7 @@ class _GradeScreenState extends State<GradeScreen> {
   }
 
   Widget _buildGPABanner(double gpa) {
+    // ignore: unused_local_variable
     final gpaColor = gpa >= 3.0
         ? AppTheme.success
         : gpa >= 2.0
@@ -245,10 +246,7 @@ class _GradeScreenState extends State<GradeScreen> {
                     ),
                     const SizedBox(width: 12),
                     if (grades.isEmpty)
-                      Text(
-                        'N/A',
-                        style: TextStyle(color: Colors.grey.shade400),
-                      )
+                      Text('N/A', style: TextStyle(color: Colors.grey.shade400))
                     else
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.end,
@@ -328,7 +326,8 @@ class _GradeScreenState extends State<GradeScreen> {
                 neededColor = AppTheme.danger;
               } else {
                 final letter = GradeUtils.letterGrade(neededGP * 25);
-                neededLabel = 'Need GP ${neededGP.toStringAsFixed(2)} ($letter)';
+                neededLabel =
+                    'Need GP ${neededGP.toStringAsFixed(2)} ($letter)';
                 neededColor = GradeUtils.gradeColor(neededGP * 25);
               }
             }
