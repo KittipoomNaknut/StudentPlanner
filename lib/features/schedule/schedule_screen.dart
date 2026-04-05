@@ -189,7 +189,7 @@ class _ScheduleScreenState extends State<ScheduleScreen>
               shape: BoxShape.circle,
             ),
             markerDecoration: const BoxDecoration(
-              color: AppTheme.secondary,
+              color: AppTheme.orange,
               shape: BoxShape.circle,
             ),
             markerSize: 6,
