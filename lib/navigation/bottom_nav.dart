@@ -6,7 +6,8 @@ import '../features/grade/grade_screen.dart';
 import '../features/note/note_screen.dart';
 
 class BottomNav extends StatefulWidget {
-  const BottomNav({super.key});
+  final void Function(ThemeMode) onThemeChanged;
+  const BottomNav({super.key, required this.onThemeChanged});
 
   @override
   State<BottomNav> createState() => _BottomNavState();
@@ -15,24 +16,24 @@ class BottomNav extends StatefulWidget {
 class _BottomNavState extends State<BottomNav> {
   int _currentIndex = 0;
 
-  // สร้างครั้งเดียว ไม่ rebuild เมื่อเปลี่ยน tab
-  final List<Widget> _screens = const [
-    DashboardScreen(),
-    ScheduleScreen(),
-    AssignmentScreen(),
-    GradeScreen(),
-    NoteScreen(),
-  ];
+  late final List<Widget> _screens;
+
+  @override
+  void initState() {
+    super.initState();
+    _screens = [
+      DashboardScreen(onThemeChanged: widget.onThemeChanged), // ← เพิ่ม
+      const ScheduleScreen(),
+      const AssignmentScreen(),
+      const GradeScreen(),
+      const NoteScreen(),
+    ];
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: IndexedStack(
-        // IndexedStack แสดง screen ที่ active แต่ทุก screen ยังอยู่ใน memory
-        // ต่างจาก if/else ที่จะ rebuild ทุกครั้ง
-        index: _currentIndex,
-        children: _screens,
-      ),
+      body: IndexedStack(index: _currentIndex, children: _screens),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _currentIndex,
         onDestinationSelected: (i) => setState(() => _currentIndex = i),
@@ -64,6 +65,8 @@ class _BottomNavState extends State<BottomNav> {
           ),
         ],
       ),
+      // Settings icon บน AppBar ไม่มีใน BottomNav
+      // เปิดผ่าน DashboardScreen แทน
     );
   }
 }
