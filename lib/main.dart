@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'app.dart';
+import 'features/notification/notification_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // ensureInitialized ต้องเรียกก่อนใช้ plugin ทุกตัว
+
+  // Initialize notification service
+  await NotificationService.instance.initialize();
+
   runApp(const StudentPlannerApp());
 }

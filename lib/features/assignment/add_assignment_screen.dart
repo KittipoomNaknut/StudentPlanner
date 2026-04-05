@@ -73,10 +73,20 @@ class _AddAssignmentScreenState extends State<AddAssignmentScreen> {
       status: widget.assignment?.status ?? 'pending',
     );
 
+    int savedId;
     if (_isEditing) {
       await DatabaseHelper.instance.updateAssignment(assignment);
+      savedId = assignment.id!;
+      // ยกเลิก notification เดิมก่อน แล้ว schedule ใหม่
+      await NotificationService.instance.cancelAssignmentReminder(savedId);
     } else {
-      await DatabaseHelper.instance.insertAssignment(assignment);
+      savedId = await DatabaseHelper.instance.insertAssignment(assignment);
+    }
+
+    // Schedule notification สำหรับ assignment ที่ pending
+    if (assignment.status == 'pending') {
+      final saved = assignment.copyWith(id: savedId);
+      await NotificationService.instance.scheduleAssignmentReminder(saved);
     }
 
     if (mounted) Navigator.pop(context);
