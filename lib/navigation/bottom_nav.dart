@@ -23,7 +23,6 @@ class _BottomNavState extends State<BottomNav> {
   void initState() {
     super.initState();
     _screens = [
-      const DashboardScreen(),
       const ScheduleScreen(),
       const AssignmentScreen(),
       const GradeScreen(),
