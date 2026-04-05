@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/database/database_helper.dart';
 import '../../core/models/subject.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/widgets/app_widgets.dart';
 import 'add_subject_screen.dart';
 
 class SubjectScreen extends StatefulWidget {
@@ -31,31 +32,14 @@ class _SubjectScreenState extends State<SubjectScreen> {
   }
 
   Future<void> _deleteSubject(Subject subject) async {
-    // แสดง confirm dialog ก่อนลบ
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Delete Subject'),
-        content: Text(
-          'Delete "${subject.name}"?\nAll related data will be removed.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: TextButton.styleFrom(foregroundColor: AppTheme.danger),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
+    final confirmed = await showConfirmDelete(
+      context,
+      title: 'Delete Subject',
+      content: 'Delete "${subject.name}"?\nAll related data will be removed.',
     );
-
-    if (confirm == true) {
+    if (confirmed) {
       await DatabaseHelper.instance.deleteSubject(subject.id!);
-      _loadSubjects(); // reload หลังลบ
+      _loadSubjects();
     }
   }
 
@@ -68,7 +52,6 @@ class _SubjectScreenState extends State<SubjectScreen> {
           IconButton(
             icon: const Icon(Icons.add),
             onPressed: () async {
-              // ไปหน้าเพิ่มวิชา แล้ว reload เมื่อกลับมา
               await Navigator.push(
                 context,
                 MaterialPageRoute(builder: (_) => const AddSubjectScreen()),
@@ -81,8 +64,34 @@ class _SubjectScreenState extends State<SubjectScreen> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _subjects.isEmpty
-          ? _buildEmptyState()
-          : _buildSubjectList(),
+          ? const EmptyState(
+              icon: Icons.menu_book_outlined,
+              title: 'No subjects yet',
+              subtitle: 'Tap + to add your first subject',
+            )
+          : RefreshIndicator(
+              onRefresh: _loadSubjects,
+              child: ListView.builder(
+                padding: const EdgeInsets.only(bottom: 80),
+                itemCount: _subjects.length,
+                itemBuilder: (context, index) {
+                  final subject = _subjects[index];
+                  return _SubjectCard(
+                    subject: subject,
+                    onEdit: () async {
+                      await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => AddSubjectScreen(subject: subject),
+                        ),
+                      );
+                      _loadSubjects();
+                    },
+                    onDelete: () => _deleteSubject(subject),
+                  );
+                },
+              ),
+            ),
       floatingActionButton: FloatingActionButton(
         onPressed: () async {
           await Navigator.push(
@@ -95,53 +104,9 @@ class _SubjectScreenState extends State<SubjectScreen> {
       ),
     );
   }
-
-  Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.menu_book_outlined, size: 80, color: Colors.grey.shade400),
-          const SizedBox(height: 16),
-          Text(
-            'No subjects yet',
-            style: TextStyle(fontSize: 18, color: Colors.grey.shade600),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Tap + to add your first subject',
-            style: TextStyle(color: Colors.grey.shade500),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSubjectList() {
-    return ListView.builder(
-      padding: const EdgeInsets.only(bottom: 80), // เว้นพื้นที่ FAB
-      itemCount: _subjects.length,
-      itemBuilder: (context, index) {
-        final subject = _subjects[index];
-        return _SubjectCard(
-          subject: subject,
-          onEdit: () async {
-            await Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => AddSubjectScreen(subject: subject),
-              ),
-            );
-            _loadSubjects();
-          },
-          onDelete: () => _deleteSubject(subject),
-        );
-      },
-    );
-  }
 }
 
-// ── SUBJECT CARD ──────────────────────────────────────────
+// ── SUBJECT CARD ──────────────────────────────────────────────
 class _SubjectCard extends StatelessWidget {
   final Subject subject;
   final VoidCallback onEdit;
@@ -159,13 +124,21 @@ class _SubjectCard extends StatelessWidget {
 
     return Card(
       child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: color,
-          child: Text(
-            subject.name.substring(0, 1).toUpperCase(),
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
+        leading: Container(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Center(
+            child: Text(
+              subject.name.substring(0, 1).toUpperCase(),
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 18,
+              ),
             ),
           ),
         ),
@@ -174,8 +147,11 @@ class _SubjectCard extends StatelessWidget {
           style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         subtitle: Text(
-          '${subject.code}  •  ${subject.credits} credits'
-          '${subject.teacher.isNotEmpty ? '  •  ${subject.teacher}' : ''}',
+          [
+            if (subject.code.isNotEmpty) subject.code,
+            '${subject.credits} credits',
+            if (subject.teacher.isNotEmpty) subject.teacher,
+          ].join('  ·  '),
         ),
         trailing: PopupMenuButton<String>(
           onSelected: (val) {
@@ -183,10 +159,25 @@ class _SubjectCard extends StatelessWidget {
             if (val == 'delete') onDelete();
           },
           itemBuilder: (_) => [
-            const PopupMenuItem(value: 'edit', child: Text('Edit')),
+            const PopupMenuItem(
+              value: 'edit',
+              child: Row(
+                children: [
+                  Icon(Icons.edit_outlined, size: 18),
+                  SizedBox(width: 8),
+                  Text('Edit'),
+                ],
+              ),
+            ),
             const PopupMenuItem(
               value: 'delete',
-              child: Text('Delete', style: TextStyle(color: Colors.red)),
+              child: Row(
+                children: [
+                  Icon(Icons.delete_outline, size: 18, color: Colors.red),
+                  SizedBox(width: 8),
+                  Text('Delete', style: TextStyle(color: Colors.red)),
+                ],
+              ),
             ),
           ],
         ),

@@ -6,6 +6,7 @@ import '../models/assignment.dart';
 import '../models/grade.dart';
 import '../models/schedule.dart';
 import '../models/note.dart';
+import '../models/attendance.dart';
 
 class DatabaseHelper {
   // ── SINGLETON ─────────────────────────────────────────
@@ -22,7 +23,12 @@ class DatabaseHelper {
   Future<Database> _initDB() async {
     final dir = await getApplicationDocumentsDirectory();
     final path = join(dir.path, 'student_planner.db');
-    return await openDatabase(path, version: 1, onCreate: _createTables);
+    return await openDatabase(
+      path,
+      version: 2,
+      onCreate: _createTables,
+      onUpgrade: _onUpgrade,
+    );
   }
 
   Future<void> _createTables(Database db, int version) async {
@@ -87,6 +93,32 @@ class DatabaseHelper {
         FOREIGN KEY (subject_id) REFERENCES subjects(id) ON DELETE CASCADE
       )
     ''');
+
+    await db.execute('''
+      CREATE TABLE attendance (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        subject_id INTEGER NOT NULL,
+        date       TEXT NOT NULL,
+        status     TEXT NOT NULL DEFAULT 'present',
+        note       TEXT DEFAULT '',
+        FOREIGN KEY (subject_id) REFERENCES subjects(id) ON DELETE CASCADE
+      )
+    ''');
+  }
+
+  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS attendance (
+          id         INTEGER PRIMARY KEY AUTOINCREMENT,
+          subject_id INTEGER NOT NULL,
+          date       TEXT NOT NULL,
+          status     TEXT NOT NULL DEFAULT 'present',
+          note       TEXT DEFAULT '',
+          FOREIGN KEY (subject_id) REFERENCES subjects(id) ON DELETE CASCADE
+        )
+      ''');
+    }
   }
 
   // ── SUBJECTS ──────────────────────────────────────────
@@ -120,7 +152,6 @@ class DatabaseHelper {
   Future<int> deleteSubject(int id) async {
     final db = await database;
     return await db.delete('subjects', where: 'id = ?', whereArgs: [id]);
-    // ON DELETE CASCADE จะลบ assignments, grades, schedules, notes ของวิชานี้ด้วย
   }
 
   // ── ASSIGNMENTS ───────────────────────────────────────
@@ -185,6 +216,30 @@ class DatabaseHelper {
       orderBy: 'type ASC',
     );
     return maps.map(Grade.fromMap).toList();
+  }
+
+  /// Batch-load grades for multiple subjects in one query.
+  Future<Map<int, List<Grade>>> getGradesForSubjects(
+    List<int> subjectIds,
+  ) async {
+    if (subjectIds.isEmpty) return {};
+    final db = await database;
+    final placeholders = subjectIds.map((_) => '?').join(',');
+    final maps = await db.query(
+      'grades',
+      where: 'subject_id IN ($placeholders)',
+      whereArgs: subjectIds,
+      orderBy: 'subject_id ASC, type ASC',
+    );
+    final result = <int, List<Grade>>{};
+    for (final id in subjectIds) {
+      result[id] = [];
+    }
+    for (final map in maps) {
+      final grade = Grade.fromMap(map);
+      result.putIfAbsent(grade.subjectId, () => []).add(grade);
+    }
+    return result;
   }
 
   Future<int> updateGrade(Grade g) async {
@@ -252,12 +307,24 @@ class DatabaseHelper {
     return await db.insert('notes', n.toMap());
   }
 
-  Future<List<Note>> getNotes({int? subjectId}) async {
+  Future<List<Note>> getNotes({int? subjectId, String? search}) async {
     final db = await database;
+    final where = <String>[];
+    final whereArgs = <dynamic>[];
+
+    if (subjectId != null) {
+      where.add('subject_id = ?');
+      whereArgs.add(subjectId);
+    }
+    if (search != null && search.isNotEmpty) {
+      where.add('(title LIKE ? OR content LIKE ?)');
+      whereArgs.addAll(['%$search%', '%$search%']);
+    }
+
     final maps = await db.query(
       'notes',
-      where: subjectId != null ? 'subject_id = ?' : null,
-      whereArgs: subjectId != null ? [subjectId] : null,
+      where: where.isEmpty ? null : where.join(' AND '),
+      whereArgs: whereArgs.isEmpty ? null : whereArgs,
       orderBy: 'updated_at DESC',
     );
     return maps.map(Note.fromMap).toList();
@@ -276,6 +343,67 @@ class DatabaseHelper {
   Future<int> deleteNote(int id) async {
     final db = await database;
     return await db.delete('notes', where: 'id = ?', whereArgs: [id]);
+  }
+
+  // ── ATTENDANCE ────────────────────────────────────────
+  Future<int> insertAttendance(Attendance a) async {
+    final db = await database;
+    return await db.insert(
+      'attendance',
+      a.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<List<Attendance>> getAttendance({int? subjectId}) async {
+    final db = await database;
+    final maps = await db.query(
+      'attendance',
+      where: subjectId != null ? 'subject_id = ?' : null,
+      whereArgs: subjectId != null ? [subjectId] : null,
+      orderBy: 'date DESC',
+    );
+    return maps.map(Attendance.fromMap).toList();
+  }
+
+  Future<Attendance?> getAttendanceByDate(int subjectId, String date) async {
+    final db = await database;
+    final maps = await db.query(
+      'attendance',
+      where: 'subject_id = ? AND date = ?',
+      whereArgs: [subjectId, date],
+      limit: 1,
+    );
+    return maps.isEmpty ? null : Attendance.fromMap(maps.first);
+  }
+
+  Future<int> updateAttendance(Attendance a) async {
+    final db = await database;
+    return await db.update(
+      'attendance',
+      a.toMap(),
+      where: 'id = ?',
+      whereArgs: [a.id],
+    );
+  }
+
+  Future<int> deleteAttendance(int id) async {
+    final db = await database;
+    return await db.delete('attendance', where: 'id = ?', whereArgs: [id]);
+  }
+
+  /// Returns all data as a JSON-serializable map for export.
+  Future<Map<String, dynamic>> exportAll() async {
+    final db = await database;
+    return {
+      'exported_at': DateTime.now().toIso8601String(),
+      'subjects': await db.query('subjects'),
+      'assignments': await db.query('assignments'),
+      'grades': await db.query('grades'),
+      'schedules': await db.query('schedules'),
+      'notes': await db.query('notes'),
+      'attendance': await db.query('attendance'),
+    };
   }
 
   // ── UTILITY ───────────────────────────────────────────
