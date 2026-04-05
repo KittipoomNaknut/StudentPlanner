@@ -23,6 +23,7 @@ class _BottomNavState extends State<BottomNav> {
   void initState() {
     super.initState();
     _screens = [
+      DashboardScreen(onThemeChanged: widget.onThemeChanged), // ← เพิ่ม
       const ScheduleScreen(),
       const AssignmentScreen(),
       const GradeScreen(),
